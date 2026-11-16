@@ -1,61 +1,239 @@
-// Every tuning number and colour in one place. The playfield is a fixed 1280x720 logical area;
-// the renderer scales it to the window, so no rule below depends on the screen size.
+// Core arena geometry, difficulty tiers, prism attunements, enemy specs, and 5 Kiln Trials.
 
-export const FIELD = { width: 1280, height: 720, groundY: 664 };
-
-/** The simulation's fixed step, in seconds: 60 updates a second whatever the display's rate. */
-export const STEP = 1 / 60;
-
-export const PLAYER = {
-  width: 72,
-  height: 24,
-  speed: 560,
-  invulnerable: 1.5,
+export const ARENA = {
+  width: 1280,
+  height: 720,
+  centerX: 640,
+  centerY: 366,
+  outerRadius: 298,
+  lanternRadius: 34,
+  prismMinDistFromCenter: 74,
+  prismMaxDistFromCenter: 266,
+  prismLinkRange: 390,
 };
 
-export const LIVES = 3;
-
-export const BLOCK = {
-  minWidth: 40,
-  maxWidth: 110,
-  height: 36,
-  speed: 240,
-  speedPerLevel: 30,
-  speedJitter: 90,
-  interval: 0.55,
-  intervalScale: 0.88,
-  minInterval: 0.14,
-  dodgePoints: 1,
+export const DIFFICULTY_MODES = {
+  apprentice: {
+    id: 'apprentice',
+    label: 'Apprentice',
+    subtitle: 'Generous Heart-Lantern warmth & gentler enemy pace',
+    enemyHpScale: 0.82,
+    enemySpeedScale: 0.86,
+    lanternMaxHp: 130,
+    playerMaxHp: 6,
+    scoreMult: 1.0,
+  },
+  artisan: {
+    id: 'artisan',
+    label: 'Artisan',
+    subtitle: 'Standard Crucible balance · 1.25x score multiplier',
+    enemyHpScale: 1.0,
+    enemySpeedScale: 1.0,
+    lanternMaxHp: 100,
+    playerMaxHp: 5,
+    scoreMult: 1.25,
+  },
+  masterwork: {
+    id: 'masterwork',
+    label: 'Masterwork',
+    subtitle: 'Fierce rime surges & ruthless boss cadence · 1.6x score',
+    enemyHpScale: 1.24,
+    enemySpeedScale: 1.14,
+    lanternMaxHp: 85,
+    playerMaxHp: 4,
+    scoreMult: 1.6,
+  },
 };
 
-export const COIN = {
-  size: 24,
-  speed: 190,
-  speedPerLevel: 14,
-  interval: 1.4,
-  intervalJitter: 0.8,
-  points: 10,
+export const PRISM_ORDER = ['ruby', 'cyan', 'topaz'];
+
+export const PRISM_SPECS = {
+  ruby: {
+    id: 'ruby',
+    name: 'Ruby Splitter',
+    shortLabel: 'RUBY',
+    color: '#ff3e6c',
+    coreColor: '#ffd4e0',
+    glowColor: 'rgba(255, 62, 108, 0.52)',
+    damageMult: 1.45,
+    maxDurability: 14,
+    summary: 'Splits bolts into a 3-lance crimson fan + chains to next Prism.',
+  },
+  cyan: {
+    id: 'cyan',
+    name: 'Tourmaline Arc',
+    shortLabel: 'CYAN',
+    color: '#18e4ff',
+    coreColor: '#dcfbff',
+    glowColor: 'rgba(24, 228, 255, 0.52)',
+    damageMult: 1.4,
+    maxDurability: 16,
+    summary: 'Relays instant lightning arcs between Prisms & slows hit foes.',
+  },
+  topaz: {
+    id: 'topaz',
+    name: 'Topaz Sunburst',
+    shortLabel: 'TOPAZ',
+    color: '#ffd24c',
+    coreColor: '#fff8db',
+    glowColor: 'rgba(255, 210, 76, 0.54)',
+    damageMult: 1.5,
+    maxDurability: 15,
+    summary: 'Pulses a solar shockwave ring every 2nd refraction + chains beam.',
+  },
 };
 
-/** Seconds of play per level, and the last level: speeds and spawn rates stop growing there. */
-export const LEVEL = { seconds: 12, max: 12 };
-
-/** How many falling things can exist at once; the pool is allocated once, at boot. */
-export const POOL_SIZE = 64;
-
-export const PALETTE = {
-  backdrop: '#11141b',
-  sky: '#1b1f2a',
-  ground: '#2a3040',
-  player: '#4fc3f7',
-  block: '#e5534b',
-  coin: '#f2c94c',
-  panel: '#252b38',
-  text: '#eef1f5',
-  muted: '#8b93a3',
+export const ENEMY_SPECS = {
+  skitterer: {
+    id: 'skitterer',
+    name: 'Ash Skitterer',
+    hp: 26,
+    speed: 96,
+    radius: 13,
+    score: 90,
+    shards: 1,
+    lanternDamage: 9,
+    color: '#8ce8ff',
+    trim: '#3a7ca5',
+  },
+  caster: {
+    id: 'caster',
+    name: 'Rime Caster',
+    hp: 42,
+    speed: 68,
+    radius: 16,
+    score: 150,
+    shards: 2,
+    lanternDamage: 10,
+    color: '#b497ff',
+    trim: '#6942c2',
+  },
+  bulwark: {
+    id: 'bulwark',
+    name: 'Slag Bulwark',
+    hp: 78,
+    speed: 52,
+    radius: 20,
+    score: 240,
+    shards: 3,
+    lanternDamage: 16,
+    shieldHalfArc: 1.12,
+    color: '#6fffe9',
+    trim: '#1f7a8c',
+  },
+  siphon: {
+    id: 'siphon',
+    name: 'Siphon Moth',
+    hp: 34,
+    speed: 112,
+    radius: 14,
+    score: 165,
+    shards: 2,
+    lanternDamage: 8,
+    color: '#e87aff',
+    trim: '#8d2eb3',
+  },
+  splitter: {
+    id: 'splitter',
+    name: 'Cinder Splitter',
+    hp: 56,
+    speed: 66,
+    radius: 18,
+    score: 190,
+    shards: 2,
+    lanternDamage: 12,
+    color: '#72efdd',
+    trim: '#2a9d8f',
+  },
+  mite: {
+    id: 'mite',
+    name: 'Frost Mite',
+    hp: 15,
+    speed: 126,
+    radius: 9,
+    score: 55,
+    shards: 1,
+    lanternDamage: 5,
+    color: '#caf0f8',
+    trim: '#48cae4',
+  },
 };
 
-export const FONT = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+export const BOSS_SPEC = {
+  name: 'Vespera, The Rime Sovereign',
+  maxHp: 960,
+  radius: 36,
+  orbitRadius: 205,
+  score: 3200,
+  pylonHp: 95,
+};
 
-/** Where the best score is kept between visits (this browser only). */
-export const BEST_KEY = 'block-dodger.best';
+export const TRIAL_WAVES = [
+  {
+    trial: 1,
+    title: 'The Outer Flue',
+    subtitle: 'Shoot Prisms [RMB / E] to refract laser webs',
+    openingBurst: 4,
+    batchSize: 2,
+    spawnInterval: 1.75,
+    budget: [
+      { kind: 'skitterer', count: 10 },
+      { kind: 'caster', count: 4 },
+      { kind: 'splitter', count: 3 },
+    ],
+  },
+  {
+    trial: 2,
+    title: 'Gallery of Slag',
+    subtitle: 'Bounce beams behind Bulwark front shields',
+    openingBurst: 5,
+    batchSize: 2,
+    spawnInterval: 1.65,
+    budget: [
+      { kind: 'skitterer', count: 9 },
+      { kind: 'bulwark', count: 5 },
+      { kind: 'caster', count: 5 },
+      { kind: 'siphon', count: 3 },
+    ],
+  },
+  {
+    trial: 3,
+    title: 'The Rime Conduit',
+    subtitle: 'Guard Prisms from Siphon Moths & chain triads',
+    openingBurst: 6,
+    batchSize: 2,
+    spawnInterval: 1.5,
+    budget: [
+      { kind: 'skitterer', count: 11 },
+      { kind: 'caster', count: 6 },
+      { kind: 'bulwark', count: 6 },
+      { kind: 'siphon', count: 5 },
+      { kind: 'splitter', count: 5 },
+    ],
+  },
+  {
+    trial: 4,
+    title: 'Crucible Tempest',
+    subtitle: 'Unleash Kiln Supernova [F] at 100% Resonance',
+    openingBurst: 7,
+    batchSize: 3,
+    spawnInterval: 1.65,
+    budget: [
+      { kind: 'skitterer', count: 13 },
+      { kind: 'caster', count: 7 },
+      { kind: 'bulwark', count: 7 },
+      { kind: 'siphon', count: 6 },
+      { kind: 'splitter', count: 7 },
+    ],
+  },
+  {
+    trial: 5,
+    title: 'Sanctum of Absolute Zero',
+    subtitle: 'Shatter Vespera across 3 glacial phases',
+    isBossTrial: true,
+    openingBurst: 3,
+    batchSize: 2,
+    spawnInterval: 2.8,
+    budget: [],
+  },
+];

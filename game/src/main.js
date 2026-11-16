@@ -1,134 +1,229 @@
-// Boot and the one loop: input is read every frame, the world advances in fixed 1/60 s steps
-// (several in a slow frame, none in a fast one), and the renderer paints what is there. The game
-// moves between four screens: title, play, paused and game over.
-//
-// ?seed=N fixes the falling pattern. ?shot=start|play|end (with &seed=N) stages that scene
-// instead of running the loop, paints it twice and sets window.__shotReady for a screenshot.
-import { BEST_KEY, LIVES, STEP } from './config.js';
-import { createRandom } from './random.js';
-import { createWorld, EVENT_HIT, EVENT_OVER } from './world.js';
-import { ACTION_CONFIRM, ACTION_PAUSE, createInput } from './input.js';
-import { createRenderer, SCREEN_OVER, SCREEN_PAUSED, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
-import { stageShot } from './shots.js';
+// EMBERGLASS main bootstrap: fixed 60 Hz simulation step, persistence, and state orchestration.
 
-/** The longest frame the loop catches up on; a longer stall (a hidden tab) is dropped, not replayed. */
-const MAX_FRAME = 0.25;
+import { createInputController } from './input.js';
+import { createSoundEngine } from './audio.js';
+import { createEffectsSystem } from './effects.js';
+import {
+  chooseTemperingUpgrade,
+  computeRunStars,
+  createWorldState,
+  setupTitleAttractScene,
+  startNewRun,
+  stepWorldSimulation,
+} from './world.js';
+import { renderGameFrame } from './render.js';
+import { createOverlayUI } from './ui.js';
 
-const params = new URLSearchParams(window.location.search);
-const shot = params.get('shot');
-const seedParam = Number.parseInt(params.get('seed') ?? '', 10);
-const seed = Number.isInteger(seedParam) ? seedParam : Math.floor(Math.random() * 4294967296);
+const SAVE_STORAGE_KEY = 'emberglass.save.v1';
+const FIXED_DT = 1 / 60;
 
-const canvas = document.getElementById('game');
-const status = document.getElementById('status');
-const world = createWorld(createRandom(seed));
-const renderer = createRenderer(canvas);
-
-function readBest() {
+function loadSaveData() {
   try {
-    return Number.parseInt(window.localStorage.getItem(BEST_KEY) ?? '0', 10) || 0;
+    const raw = window.localStorage.getItem(SAVE_STORAGE_KEY);
+    if (!raw) return { bestScore: 0, bestStars: 0, difficulty: 'artisan', muted: false };
+    const parsed = JSON.parse(raw);
+    return {
+      bestScore: Number(parsed.bestScore) || 0,
+      bestStars: Number(parsed.bestStars) || 0,
+      difficulty: typeof parsed.difficulty === 'string' ? parsed.difficulty : 'artisan',
+      muted: Boolean(parsed.muted),
+    };
   } catch {
-    return 0;
+    return { bestScore: 0, bestStars: 0, difficulty: 'artisan', muted: false };
   }
 }
 
-function saveBest(value) {
+function persistSaveData(save) {
   try {
-    window.localStorage.setItem(BEST_KEY, String(value));
+    window.localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(save));
   } catch {
-    // Storage can be off (private windows): the best score then lasts this visit only.
+    // Ignore private-browsing storage restrictions
   }
 }
 
-function runShot(name) {
-  const scene = stageShot(name, world);
-  let painted = 0;
-  function paint() {
-    renderer.draw(world.state, scene.screen, scene.best);
-    painted += 1;
-    if (painted < 2) requestAnimationFrame(paint);
-    else window.__shotReady = true;
-  }
-  requestAnimationFrame(paint);
-}
+function bootstrapEmberglass() {
+  const canvas = document.getElementById('game-canvas');
+  const overlayRoot = document.getElementById('overlay-root');
+  const ctx = canvas.getContext('2d');
 
-function runGame() {
-  const input = createInput(canvas);
-  let screen = SCREEN_TITLE;
-  let best = readBest();
-  let accumulator = 0;
-  let last = performance.now();
+  const saveData = loadSaveData();
+  const params = new URLSearchParams(window.location.search);
+  const urlSeed = Number(params.get('seed')) || 20261116;
 
-  // Screen readers (and anyone watching the page's text) hear the screen changes and each hit.
-  function announce(message) {
-    status.textContent = message;
-  }
+  const world = createWorldState(urlSeed);
+  world.difficulty = saveData.difficulty;
 
-  function startGame() {
-    world.reset();
-    accumulator = 0;
-    screen = SCREEN_PLAY;
-    announce(`Playing. ${LIVES} lives.`);
-  }
+  const effects = createEffectsSystem(world.rng);
+  const audio = createSoundEngine();
+  audio.setMuted(saveData.muted);
+  const input = createInputController(canvas);
 
-  function endGame() {
-    screen = SCREEN_OVER;
-    if (world.state.score > best) {
-      best = world.state.score;
-      saveBest(best);
+  function recordRunCompletion() {
+    if (world.score > saveData.bestScore) {
+      saveData.bestScore = world.score;
+      world.isNewBest = true;
     }
-    announce(`Game over. Score ${world.state.score}. Best ${best}.`);
-  }
-
-  function handleActions() {
-    const actions = input.takeActions();
-    if (actions & ACTION_CONFIRM && (screen === SCREEN_TITLE || screen === SCREEN_OVER)) startGame();
-    else if (actions & ACTION_PAUSE && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    } else if (actions & (ACTION_PAUSE | ACTION_CONFIRM) && screen === SCREEN_PAUSED) {
-      screen = SCREEN_PLAY;
-      announce('Playing.');
+    const stars = computeRunStars(world);
+    if (stars > saveData.bestStars) {
+      saveData.bestStars = stars;
     }
+    persistSaveData(saveData);
   }
 
-  function step() {
-    if (screen === SCREEN_TITLE) {
-      world.step(STEP, 0, true);
-      return;
-    }
-    const events = world.step(STEP, input.direction(), false);
-    if (events & EVENT_OVER) endGame();
-    else if (events & EVENT_HIT) announce(world.state.lives === 1 ? 'Hit. 1 life left.' : `Hit. ${world.state.lives} lives left.`);
-  }
-
-  function frame(now) {
-    requestAnimationFrame(frame);
-    accumulator += Math.min((now - last) / 1000, MAX_FRAME);
-    last = now;
-    handleActions();
-    if (screen === SCREEN_TITLE || screen === SCREEN_PLAY) {
-      while (accumulator >= STEP && (screen === SCREEN_TITLE || screen === SCREEN_PLAY)) {
-        step();
-        accumulator -= STEP;
+  const ui = createOverlayUI(overlayRoot, {
+    onSelectDifficulty(diffId) {
+      audio.unlock();
+      world.difficulty = diffId;
+      saveData.difficulty = diffId;
+      persistSaveData(saveData);
+      ui.forceRefresh();
+      ui.sync(world, saveData, audio.muted);
+    },
+    onStartRun() {
+      audio.unlock();
+      const nextSeed = params.has('seed') ? Number(params.get('seed')) : undefined;
+      startNewRun(world, world.difficulty, nextSeed, effects);
+      ui.sync(world, saveData, audio.muted);
+    },
+    onPickTempering(temperingId) {
+      audio.unlock();
+      chooseTemperingUpgrade(world, temperingId, audio, effects);
+      ui.sync(world, saveData, audio.muted);
+    },
+    onResume() {
+      if (world.mode === 'paused') {
+        world.mode = 'playing';
+        ui.sync(world, saveData, audio.muted);
       }
-    } else {
-      accumulator = 0;
-    }
-    renderer.draw(world.state, screen, best);
-  }
-
-  // Leaving the tab pauses a running game rather than letting blocks fall unseen.
-  document.addEventListener('visibilitychange', () => {
-    if (document.hidden && screen === SCREEN_PLAY) {
-      screen = SCREEN_PAUSED;
-      announce('Paused.');
-    }
+    },
+    onReturnTitle() {
+      world.mode = 'title';
+      effects.clearAll();
+      setupTitleAttractScene(world);
+      ui.sync(world, saveData, audio.muted);
+    },
+    onToggleMute() {
+      const muted = audio.toggleMute();
+      saveData.muted = muted;
+      persistSaveData(saveData);
+      ui.forceRefresh();
+      ui.sync(world, saveData, audio.muted);
+    },
+    onRefreshUI() {
+      ui.sync(world, saveData, audio.muted);
+    },
   });
 
-  announce('Block Dodger. Press Space or click to start.');
-  requestAnimationFrame(frame);
+  function handleGlobalShortcuts(actions) {
+    if (actions.mute) {
+      saveData.muted = audio.toggleMute();
+      persistSaveData(saveData);
+      ui.forceRefresh();
+    }
+
+    if (world.mode === 'title') {
+      if (actions.confirm) {
+        audio.unlock();
+        startNewRun(world, world.difficulty, params.has('seed') ? Number(params.get('seed')) : undefined, effects);
+      }
+      return;
+    }
+
+    if (world.mode === 'tempering') {
+      if (actions.prismSelect !== null && world.draftChoices[actions.prismSelect]) {
+        chooseTemperingUpgrade(world, world.draftChoices[actions.prismSelect].id, audio, effects);
+        actions.prismSelect = null;
+      }
+      return;
+    }
+
+    if (world.mode === 'playing' && actions.pause) {
+      world.mode = 'paused';
+      return;
+    }
+
+    if (world.mode === 'paused') {
+      if (actions.pause) {
+        world.mode = 'playing';
+      } else if (actions.restart) {
+        startNewRun(world, world.difficulty, undefined, effects);
+      }
+      return;
+    }
+
+    if (world.mode === 'victory' || world.mode === 'gameover') {
+      if (actions.restart || actions.confirm) {
+        startNewRun(world, world.difficulty, undefined, effects);
+      }
+    }
+  }
+
+  function advanceOneFixedStep() {
+    const actions = input.consumeFrameActions();
+    handleGlobalShortcuts(actions);
+
+    stepWorldSimulation(world, actions, FIXED_DT, audio, effects, (newMode) => {
+      if (newMode === 'victory' || newMode === 'gameover') {
+        recordRunCompletion();
+      }
+    });
+
+    const intensity = world.boss ? 0.9 : 0.3 + world.trialIndex * 0.12;
+    audio.updateMusic(FIXED_DT, world.mode === 'playing', intensity);
+    ui.sync(world, saveData, audio.muted);
+  }
+
+  let lastTimestamp = performance.now();
+  let accumulator = 0;
+
+  function animationLoop(now) {
+    const elapsed = Math.min(0.1, Math.max(0, (now - lastTimestamp) / 1000));
+    lastTimestamp = now;
+    accumulator += elapsed;
+
+    while (accumulator >= FIXED_DT) {
+      advanceOneFixedStep();
+      accumulator -= FIXED_DT;
+    }
+
+    renderGameFrame(ctx, world, effects, input.state, saveData, audio.muted);
+    window.requestAnimationFrame(animationLoop);
+  }
+
+  ui.sync(world, saveData, audio.muted);
+  renderGameFrame(ctx, world, effects, input.state, saveData, audio.muted);
+  window.requestAnimationFrame(animationLoop);
+
+  // Expose clean inspection & deterministic step hook for automated verification
+  window.__emberglass = {
+    getState() {
+      return {
+        mode: world.mode,
+        trial: world.trialIndex,
+        score: world.score,
+        combo: world.combo,
+        maxCombo: world.stats.maxCombo,
+        lanternHp: world.lanternHp,
+        playerHp: world.player.hp,
+        prisms: world.prisms.map((p) => ({ x: p.x, y: p.y, kind: p.kind })),
+        enemies: world.enemies.map((e) => ({ x: e.x, y: e.y, kind: e.kind, hp: e.hp })),
+        pylons: world.pylons.map((p) => ({ x: p.x, y: p.y, hp: p.hp })),
+        boss: world.boss ? { x: world.boss.x, y: world.boss.y, hp: world.boss.hp, phase: world.boss.phase } : null,
+        player: { x: world.player.x, y: world.player.y, dashCooldown: world.player.dashCooldown },
+        shards: world.shards.map((s) => ({ x: s.x, y: s.y })),
+        novaCharge: world.novaCharge,
+        prismCharges: world.prismCharges,
+        beamCount: effects.beams.length,
+        stats: { ...world.stats },
+      };
+    },
+    stepFrames(count = 1) {
+      for (let i = 0; i < count; i++) {
+        advanceOneFixedStep();
+      }
+      renderGameFrame(ctx, world, effects, input.state, saveData, audio.muted);
+    },
+  };
 }
 
-if (shot) runShot(shot);
-else runGame();
+bootstrapEmberglass();
