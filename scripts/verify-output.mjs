@@ -11,7 +11,7 @@ for (const file of tree.files) {
   assert.ok(lstatSync(join(output, 'game', file.path)).isFile());
   assert.deepEqual(readFileSync(join(output, 'game', file.path)), readFileSync(join('game', file.path)), file.path);
 }
-const names = ['1-title.jpg', '2-boss.jpg', '3-trials.jpg', '4-victory.jpg'];
+const names = ['1-title.jpg', '2-gameplay.jpg', '3-boss.jpg', '4-scale.jpg'];
 assert.deepEqual(readdirSync(join(output, 'screenshots')).sort(), names);
 assert.deepEqual(JSON.parse(readFileSync('shots.json')).map(s => s.name), names);
 function jpegDimensions(bytes) {

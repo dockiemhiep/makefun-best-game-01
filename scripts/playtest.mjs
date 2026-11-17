@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const origin = process.env.GAME_URL || 'http://127.0.0.1:8093';
-const evidence = process.env.EVIDENCE_DIR || '/tmp/emberglass-phase3-evidence';
+const evidence = process.env.EVIDENCE_DIR || '/tmp/emberglass-phase4-evidence';
 const capture = process.argv.includes('--capture');
 mkdirSync(evidence, { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
@@ -107,14 +107,17 @@ try {
   await page.getByRole('button', { name: 'START RUN [ENTER]', exact: true }).click();
   await page.evaluate(() => {
     window.botTick = 0;
-    window.playCombatBatch = (stopForBoss = false) => {
+    window.playCombatBatch = (stopFor = '') => {
       const api = window.__emberglass, canvas = document.querySelector('canvas');
       const key = code => { window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true })); window.dispatchEvent(new KeyboardEvent('keyup', { code, bubbles: true })); };
       const mouse = (type, x, y, button = 0) => canvas.dispatchEvent(new MouseEvent(type, { clientX: x, clientY: y, button, bubbles: true }));
       for (let i = 0; i < 500; i++) {
         const s = api.getState();
         if (s.mode !== 'playing') return s;
-        if (stopForBoss && s.boss?.phase === 2 && s.boss.phaseGuardTimer === 0 && s.beamCount >= 3 && s.prisms.length >= 3 && s.screenFlash < .06) return s;
+        // Screenshot stops: a trial-4 chain with foes on the field, then a settled phase-3 boss frame.
+        const webUp = s.prisms.length >= 3 && s.screenFlash < .06;
+        if (stopFor === 'gameplay' && s.trial === 4 && webUp && s.enemies.length >= 4 && s.beamCount >= 15) return s;
+        if (stopFor === 'boss' && s.boss?.phase === 3 && s.boss.phaseGuardTimer === 0 && webUp && s.beamCount >= 3) return s;
         window.botTick++;
         if (s.prisms.length < Math.min(3, s.modifiers.maxPrisms) || (botTick % 90 === 0 && s.prismCharges >= 1)) {
           const slots = [0, 1, 2].map(n => ({ x: 640 + Math.cos(n * 2 * Math.PI / 3 - Math.PI / 2) * 140, y: 366 + Math.sin(n * 2 * Math.PI / 3 - Math.PI / 2) * 140 }));
@@ -136,13 +139,18 @@ try {
       return api.getState();
     };
   });
-  let bossCaptured = false, victory = null;
+  let gameplayCaptured = false, bossCaptured = false, victory = null;
   const drafts = [];
   for (let batch = 0; batch < 60; batch++) {
-    let s = await page.evaluate(stop => window.playCombatBatch(stop), !bossCaptured);
+    let s = await page.evaluate(stop => window.playCombatBatch(stop), !gameplayCaptured ? 'gameplay' : !bossCaptured ? 'boss' : '');
     assert.notEqual(s.mode, 'gameover', 'campaign bot must win without cheats');
-    if (!bossCaptured && s.boss?.phase === 2 && s.beamCount >= 3) {
-      await shot(page, '2-boss.jpg'); bossCaptured = true;
+    if (!gameplayCaptured && s.mode === 'playing' && s.trial === 4 && s.enemies.length >= 4 && s.beamCount >= 15) {
+      await shot(page, '2-gameplay.jpg'); gameplayCaptured = true;
+      writeFileSync(`${evidence}/gameplay-state.json`, JSON.stringify(s, null, 2));
+      continue;
+    }
+    if (gameplayCaptured && !bossCaptured && s.boss?.phase === 3 && s.beamCount >= 3) {
+      await shot(page, '3-boss.jpg'); bossCaptured = true;
       writeFileSync(`${evidence}/boss-state.json`, JSON.stringify(s, null, 2));
       // Pause on trial 5 and restart; four relics and previous score must survive.
       await page.keyboard.press('p'); await tick(page);
@@ -162,7 +170,6 @@ try {
       assert.ok(s.progression.apprentice[s.trial - 1].bestScore > 0);
       if (s.trial === 2) {
         await page.getByRole('heading', { name: 'CHOOSE YOUR UPGRADE' }).click();
-        await shot(page, '3-trials.jpg');
         await auditScreen(page, 'upgrade');
       }
       await page.screenshot({ path: `${evidence}/upgrade-${s.trial}.png` });
@@ -178,19 +185,27 @@ try {
       assert.notDeepEqual(chosen.modifiers, s.modifiers);
       assert.equal(await page.locator(`[data-trial="${s.trial + 1}"]:not(:disabled)`).count(), 1);
       await page.screenshot({ path: `${evidence}/progression-${s.trial}.png` });
+      if (s.trial === 4) {
+        // Campaign map: four trials cleared, four relics forged, the boss node is next.
+        assert.match(await page.locator('.campaign-scope').innerText(), /5\s*TRIALS\s*3\s*-PHASE BOSS\s*10\s*RELICS\s*6\s*FOE TYPES/);
+        await page.getByRole('heading', { name: 'TRIAL SELECT', exact: true }).click();
+        await shot(page, '4-scale.jpg');
+      }
       if (s.trial === 2) await auditScreen(page, 'progression');
       drafts.push({ afterTrial: s.trial, picked: choice.id, trialBest: chosen.progression.apprentice[s.trial - 1].bestScore });
       await page.locator(`[data-trial="${s.trial + 1}"]`).click();
     }
     if (s.mode === 'victory') { victory = s; break; }
   }
-  assert.ok(victory, 'full campaign reached victory'); assert.ok(bossCaptured, 'phase-2 boss fight captured with visible beams');
+  assert.ok(victory, 'full campaign reached victory'); assert.ok(gameplayCaptured, 'trial-4 chain captured with foes on the field'); assert.ok(bossCaptured, 'phase-3 boss fight captured with visible beams');
   assert.equal(victory.stats.trialsCleared, 5); assert.equal(victory.temperingIds.length, 4);
   assert.deepEqual(victory.stats.bossPhasesSeen, [1, 2, 3]);
   assert.ok(victory.progression.apprentice.every(t => t.cleared && t.bestScore > 0));
   await tick(page, 90);
   await page.getByRole('heading', { name: 'VICTORY', exact: true }).click();
-  await shot(page, '4-victory.jpg');
+  await page.screenshot({ path: `${evidence}/victory.png` });
+  assert.match(await page.locator('.result-headline').innerText(), /5 \/ 5\s*TRIALS CLEARED[\s\S]*FINAL SCORE[\s\S]*4\s*RELICS FORGED/i);
+  assert.equal(await page.locator('.stats-grid').getByText(/\d\d:\d\d/).count(), 0);
   await auditScreen(page, 'victory');
   writeFileSync(`${evidence}/victory-state.json`, JSON.stringify(victory, null, 2));
   await page.getByRole('button', { name: 'RESTART RUN [R]', exact: true }).click();

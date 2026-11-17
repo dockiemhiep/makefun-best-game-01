@@ -1,5 +1,6 @@
 // Five-trial route map: actual saved clears, unlock gates, records, and the next run destination.
-import { DIFFICULTY_MODES, TRIAL_WAVES } from './config.js';
+import { DIFFICULTY_MODES, ENEMY_SPECS, TRIAL_WAVES } from './config.js';
+import { TEMPERING_CATALOG } from './temperings.js';
 import { isTrialUnlocked } from './progression.js';
 
 export function renderTrialSelectScreen(world, save) {
@@ -24,9 +25,9 @@ export function renderTrialSelectScreen(world, save) {
   return `<section class="overlay-screen stained-menu progression-screen" aria-label="Trial select and progression">
     <div class="eyebrow-row"><span>${DIFFICULTY_MODES[world.difficulty].label.toUpperCase()} · FIVE KILN TRIALS</span><span>${records.filter(t => t.cleared).length} / 5 CLEARED</span></div>
     <header class="hero-header"><h2 class="result-heading">TRIAL SELECT</h2>
-      <p class="game-subtitle">${world.pendingTrial ? 'Your relic is forged. The next trial awaits.' : 'Clear each trial to unlock the next. Forge a relic after every clear.'}</p></header>
+      <p class="campaign-scope"><span><b>${TRIAL_WAVES.length}</b> TRIALS</span><span><b>3</b>-PHASE BOSS</span><span><b>${TEMPERING_CATALOG.length}</b> RELICS</span><span><b>${Object.keys(ENEMY_SPECS).length}</b> FOE TYPES</span></p></header>
     <div class="trial-route">${cards}</div>
-    <div class="relic-strip">${world.pendingTrial ? `RUN SCORE <strong>${world.score.toLocaleString('en-US')}</strong> · ${world.temperingIds.length} RELICS ACTIVE` : 'Records are saved per difficulty. Replays begin a fresh run at that trial.'}</div>
+    <div class="relic-strip">${world.pendingTrial ? `RUN SCORE <strong>${world.score.toLocaleString('en-US')}</strong> · ${world.temperingIds.length} RELICS ACTIVE` : 'Clear each trial to unlock the next. Forge 1 of 3 relics after every clear. Records are saved per difficulty.'}</div>
     <div class="cta-row"><button class="btn-secondary" data-action="return-title">TITLE SCREEN [ESC]</button></div>
   </section>`;
 }

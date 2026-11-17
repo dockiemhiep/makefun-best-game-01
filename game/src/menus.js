@@ -1,6 +1,6 @@
 // Accessible game menus: Title, Trial Select, Upgrade Draft, Pause/Settings, Victory, and Defeat.
 
-import { DIFFICULTY_MODES, formatComboMultiplier } from './config.js';
+import { DIFFICULTY_MODES, ENEMY_SPECS, TRIAL_WAVES, formatComboMultiplier } from './config.js';
 import { TEMPERING_CATALOG } from './temperings.js';
 import { computeRunStars } from './world.js';
 import { renderTrialSelectScreen } from './trial-select.js';
@@ -125,7 +125,7 @@ export function createGameMenus(rootEl, handlers) {
             <h1 class="game-title" translate="no">EMBERGLASS</h1>
             <p class="title-mantra">REFRACT THE FLAME.</p>
           </header>
-          <p class="title-goal">Build a prism web. Defend the Heart-Lantern.<br>Survive five trials. Shatter the Rime Sovereign.</p>
+          <p class="title-goal">Build a prism web. Defend the Heart-Lantern.<br><strong>${TRIAL_WAVES.length} trials · ${TEMPERING_CATALOG.length} relics · ${Object.keys(ENEMY_SPECS).length} foe types · a 3-phase boss.</strong></p>
           <div class="prism-legend"><span class="ruby">◆ RUBY SPLITS</span><span class="cyan">◆ CYAN CHAINS</span><span class="topaz">◆ TOPAZ DETONATES</span></div>
           <div class="difficulty-bar" role="group" aria-label="Select Difficulty">${diffButtons}</div>
           <div class="cta-row">
@@ -239,9 +239,19 @@ export function createGameMenus(rootEl, handlers) {
           </p>
         </div>
 
-        <div class="score-hero">
-          <div class="stat-label">Final Score</div>
-          <div class="stat-value">${world.score.toLocaleString('en-US')}</div>
+        <div class="result-headline">
+          <div class="stat-tile headline-tile">
+            <div class="stat-value">${world.stats.trialsCleared} / ${TRIAL_WAVES.length}</div>
+            <div class="stat-label">Trials Cleared</div>
+          </div>
+          <div class="score-hero">
+            <div class="stat-label">Final Score</div>
+            <div class="stat-value">${world.score.toLocaleString('en-US')}</div>
+          </div>
+          <div class="stat-tile headline-tile">
+            <div class="stat-value">${world.temperingIds.length}</div>
+            <div class="stat-label">Relics Forged</div>
+          </div>
         </div>
 
         <div class="stats-grid">
@@ -250,20 +260,12 @@ export function createGameMenus(rootEl, handlers) {
             <div class="stat-label">Peak Multiplier</div>
           </div>
           <div class="stat-tile">
-            <div class="stat-value">${world.stats.trialsCleared} / 5</div>
-            <div class="stat-label">Trials Cleared</div>
-          </div>
-          <div class="stat-tile">
             <div class="stat-value">${world.stats.enemiesShattered}</div>
             <div class="stat-label">Foes Shattered</div>
           </div>
           <div class="stat-tile">
             <div class="stat-value">${world.stats.beamsRefracted}</div>
             <div class="stat-label">Beams Refracted</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-value">${mins}:${secs}</div>
-            <div class="stat-label">Run Time</div>
           </div>
         </div>
 
@@ -274,6 +276,7 @@ export function createGameMenus(rootEl, handlers) {
           <button class="btn-secondary" data-action="open-trials">TRIAL SELECT</button>
           <button class="btn-secondary" data-action="return-title">TITLE SCREEN</button>
         </div>
+        <p class="results-fineprint">Combat clock ${mins}:${secs}</p>
       </section>
     `;
     bindCommonButtons();
