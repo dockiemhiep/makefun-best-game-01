@@ -1,6 +1,6 @@
 [
   { "name": "1-title.jpg", "query": "?seed=20261116", "scene": "title-screen-wordmark-scope-pitch-and-start" },
   { "name": "2-gameplay.jpg", "query": "?seed=20261116", "scene": "trial-4-prism-beam-chain-with-foes-and-hud" },
-  { "name": "3-boss.jpg", "query": "?seed=20261116", "scene": "trial-5-vespera-phase-3-beams-and-hud" },
-  { "name": "4-scale.jpg", "query": "?seed=20261116", "scene": "trial-map-4-of-5-cleared-boss-next-campaign-scope" }
+  { "name": "3-scale.jpg", "query": "?seed=20261116", "scene": "trial-map-4-of-5-cleared-boss-next-campaign-scope" },
+  { "name": "4-victory.jpg", "query": "?seed=20261116", "scene": "victory-5-of-5-trials-final-score-relics-and-restart" }
 ]

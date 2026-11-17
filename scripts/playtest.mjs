@@ -114,7 +114,7 @@ try {
       for (let i = 0; i < 500; i++) {
         const s = api.getState();
         if (s.mode !== 'playing') return s;
-        // Screenshot stops: a trial-4 chain with foes on the field, then a settled phase-3 boss frame.
+        // Stops: a trial-4 chain with foes on the field (screenshot), then a settled phase-3 boss frame (restart check).
         const webUp = s.prisms.length >= 3 && s.screenFlash < .06;
         if (stopFor === 'gameplay' && s.trial === 4 && webUp && s.enemies.length >= 4 && s.beamCount >= 15) return s;
         if (stopFor === 'boss' && s.boss?.phase === 3 && s.boss.phaseGuardTimer === 0 && webUp && s.beamCount >= 3) return s;
@@ -150,7 +150,7 @@ try {
       continue;
     }
     if (gameplayCaptured && !bossCaptured && s.boss?.phase === 3 && s.beamCount >= 3) {
-      await shot(page, '3-boss.jpg'); bossCaptured = true;
+      bossCaptured = true;
       writeFileSync(`${evidence}/boss-state.json`, JSON.stringify(s, null, 2));
       // Pause on trial 5 and restart; four relics and previous score must survive.
       await page.keyboard.press('p'); await tick(page);
@@ -189,7 +189,7 @@ try {
         // Campaign map: four trials cleared, four relics forged, the boss node is next.
         assert.match(await page.locator('.campaign-scope').innerText(), /5\s*TRIALS\s*3\s*-PHASE BOSS\s*10\s*RELICS\s*6\s*FOE TYPES/);
         await page.getByRole('heading', { name: 'TRIAL SELECT', exact: true }).click();
-        await shot(page, '4-scale.jpg');
+        await shot(page, '3-scale.jpg');
       }
       if (s.trial === 2) await auditScreen(page, 'progression');
       drafts.push({ afterTrial: s.trial, picked: choice.id, trialBest: chosen.progression.apprentice[s.trial - 1].bestScore });
@@ -197,13 +197,14 @@ try {
     }
     if (s.mode === 'victory') { victory = s; break; }
   }
-  assert.ok(victory, 'full campaign reached victory'); assert.ok(gameplayCaptured, 'trial-4 chain captured with foes on the field'); assert.ok(bossCaptured, 'phase-3 boss fight captured with visible beams');
+  assert.ok(victory, 'full campaign reached victory'); assert.ok(gameplayCaptured, 'trial-4 chain captured with foes on the field'); assert.ok(bossCaptured, 'phase-3 boss fight reached with visible beams');
   assert.equal(victory.stats.trialsCleared, 5); assert.equal(victory.temperingIds.length, 4);
   assert.deepEqual(victory.stats.bossPhasesSeen, [1, 2, 3]);
   assert.ok(victory.progression.apprentice.every(t => t.cleared && t.bestScore > 0));
   await tick(page, 90);
   await page.getByRole('heading', { name: 'VICTORY', exact: true }).click();
   await page.screenshot({ path: `${evidence}/victory.png` });
+  await shot(page, '4-victory.jpg');
   assert.match(await page.locator('.result-headline').innerText(), /5 \/ 5\s*TRIALS CLEARED[\s\S]*FINAL SCORE[\s\S]*4\s*RELICS FORGED/i);
   assert.equal(await page.locator('.stats-grid').getByText(/\d\d:\d\d/).count(), 0);
   await auditScreen(page, 'victory');
