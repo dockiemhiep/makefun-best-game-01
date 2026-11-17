@@ -8,6 +8,7 @@ import {
   ENEMY_SPECS,
   formatComboMultiplier,
 } from './config.js';
+import { scaleEnemyForTrial } from './difficulty.js';
 
 function normalizeAngle(a) {
   while (a > Math.PI) a -= Math.PI * 2;
@@ -17,12 +18,12 @@ function normalizeAngle(a) {
 
 export function spawnWaveEnemy(world, kind, angleOverride = null) {
   const spec = ENEMY_SPECS[kind] || ENEMY_SPECS.skitterer;
-  const diff = DIFFICULTY_MODES[world.difficulty] || DIFFICULTY_MODES.artisan;
+  const scaled = scaleEnemyForTrial(spec, world.difficulty, world.trialIndex);
   const angle = angleOverride !== null ? angleOverride : world.rng.range(0, Math.PI * 2);
   const spawnDist = ARENA.outerRadius - 8;
   const x = ARENA.centerX + Math.cos(angle) * spawnDist;
   const y = ARENA.centerY + Math.sin(angle) * spawnDist;
-  const maxHp = Math.round(spec.hp * diff.enemyHpScale * (1 + (world.trialIndex - 1) * 0.14));
+  const maxHp = scaled.maxHp;
 
   const enemy = {
     id: ++world.entitySeq,
@@ -36,7 +37,7 @@ export function spawnWaveEnemy(world, kind, angleOverride = null) {
     radius: spec.radius,
     hp: maxHp,
     maxHp,
-    speed: spec.speed * diff.enemySpeedScale,
+    speed: scaled.speed,
     score: spec.score,
     shards: spec.shards,
     lanternDamage: spec.lanternDamage,

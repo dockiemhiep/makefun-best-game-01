@@ -4,8 +4,9 @@ export const TEMPERING_CATALOG = [
   {
     id: 'bifocal_facets',
     name: 'Bifocal Facets',
+    effect: '+1 PRISM',
     tag: 'Refraction',
-    desc: '+1 max Prism on field (up to 4+) and +1 extra beam bounce depth.',
+    desc: '+1 max Prism on the field and +1 extra beam bounce depth.',
     apply(mods) {
       mods.maxPrisms += 1;
       mods.maxBounces += 1;
@@ -14,6 +15,7 @@ export const TEMPERING_CATALOG = [
   {
     id: 'quicksilver_spindle',
     name: 'Quicksilver Spindle',
+    effect: '+28% FIRE RATE',
     tag: 'Cadence',
     desc: '+28% primary Ember Bolt fire rate and +18% Weaver movement speed.',
     apply(mods) {
@@ -24,6 +26,7 @@ export const TEMPERING_CATALOG = [
   {
     id: 'heartfire_mend',
     name: 'Heartfire Mend',
+    effect: '+30 WARMTH',
     tag: 'Sanctuary',
     desc: 'Restores +30 Lantern warmth now; 6+ streak kills (2.25x+) heal the Heart-Lantern.',
     immediateLanternHeal: 30,
@@ -35,6 +38,7 @@ export const TEMPERING_CATALOG = [
   {
     id: 'phase_detonator',
     name: 'Phase Detonator',
+    effect: '−25% DASH WAIT',
     tag: 'Mobility',
     desc: 'Phase Dash cooldown -25% and leaves a volatile solar nova on takeoff.',
     apply(mods) {
@@ -45,6 +49,7 @@ export const TEMPERING_CATALOG = [
   {
     id: 'chromatic_surge',
     name: 'Chromatic Surge',
+    effect: '+40% RESONANCE',
     tag: 'Overdrive',
     desc: '+40% Resonance Overdrive gain and Kiln Supernova deals +35% damage.',
     apply(mods) {
@@ -55,6 +60,7 @@ export const TEMPERING_CATALOG = [
   {
     id: 'obsidian_edge',
     name: 'Obsidian Edge',
+    effect: '+26% DAMAGE',
     tag: 'Potency',
     desc: '+26% bolt & refracted beam damage; flanking armored foes deals +40% bonus.',
     apply(mods) {
@@ -65,8 +71,9 @@ export const TEMPERING_CATALOG = [
   {
     id: 'lodestone_weave',
     name: 'Lodestone Weave',
+    effect: '+85% SHARD PULL',
     tag: 'Harvest',
-    desc: '+85% Glass Shard pickup pull radius and each shard grants +15% Prism charge.',
+    desc: '+85% Glass Shard pickup pull radius and shards restore 30% more Prism charge.',
     apply(mods) {
       mods.magnetRadiusMult *= 1.85;
       mods.shardChargeMult *= 1.3;
@@ -75,6 +82,7 @@ export const TEMPERING_CATALOG = [
   {
     id: 'twin_crucible',
     name: 'Twin Crucible',
+    effect: 'TWIN BOLTS',
     tag: 'Barrage',
     desc: 'Every 3rd primary shot fires twin angled Ember Bolts at once.',
     apply(mods) {
@@ -84,6 +92,7 @@ export const TEMPERING_CATALOG = [
   {
     id: 'crystalline_ward',
     name: 'Crystalline Ward',
+    effect: '+1 MAX HULL',
     tag: 'Durability',
     desc: '+1 max Weaver Hull heart immediately and Prisms gain +6 durability.',
     immediateMaxHull: 1,
@@ -94,8 +103,9 @@ export const TEMPERING_CATALOG = [
   {
     id: 'sunburst_core',
     name: 'Sunburst Core',
+    effect: '+35% BURST SIZE',
     tag: 'Area',
-    desc: 'All Prism novas & shatter bursts expand +35% wider and burn lingering foes.',
+    desc: 'Prism novas & shatter bursts expand +35%; all bolt and beam damage rises +12%.',
     apply(mods) {
       mods.novaRadiusMult *= 1.35;
       mods.damageMult *= 1.12;

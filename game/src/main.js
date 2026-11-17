@@ -7,6 +7,7 @@ import { createEffectsSystem } from './effects.js';
 import {
   bufferCombatActions,
   chooseTemperingUpgrade,
+  continueTrialProgression,
   computeRunStars,
   createWorldState,
   setupTitleAttractScene,
@@ -14,41 +15,17 @@ import {
   stepWorldSimulation,
 } from './world.js';
 import { renderGameFrame } from './render.js';
-import { createOverlayUI } from './ui.js';
+import { createGameMenus } from './menus.js';
+import { loadProgressionAndSettings, persistProgressionAndSettings, isTrialUnlocked, recordTrialResult, restartCurrentTrial } from './progression.js';
 
-const SAVE_STORAGE_KEY = 'emberglass.save.v1';
 const FIXED_DT = 1 / 60;
-
-function loadSaveData() {
-  try {
-    const raw = window.localStorage.getItem(SAVE_STORAGE_KEY);
-    if (!raw) return { bestScore: 0, bestStars: 0, difficulty: 'artisan', muted: false };
-    const parsed = JSON.parse(raw);
-    return {
-      bestScore: Number(parsed.bestScore) || 0,
-      bestStars: Number(parsed.bestStars) || 0,
-      difficulty: typeof parsed.difficulty === 'string' ? parsed.difficulty : 'artisan',
-      muted: Boolean(parsed.muted),
-    };
-  } catch {
-    return { bestScore: 0, bestStars: 0, difficulty: 'artisan', muted: false };
-  }
-}
-
-function persistSaveData(save) {
-  try {
-    window.localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(save));
-  } catch {
-    // Ignore private-browsing storage restrictions
-  }
-}
 
 function bootstrapEmberglass() {
   const canvas = document.getElementById('game-canvas');
   const overlayRoot = document.getElementById('overlay-root');
   const ctx = canvas.getContext('2d');
 
-  const saveData = loadSaveData();
+  const saveData = loadProgressionAndSettings();
   const params = new URLSearchParams(window.location.search);
   const urlSeed = Number(params.get('seed')) || 20261116;
 
@@ -58,6 +35,7 @@ function bootstrapEmberglass() {
   const effects = createEffectsSystem(world.rng);
   const audio = createSoundEngine();
   audio.setMuted(saveData.muted);
+  audio.setVolume(saveData.volume);
   const input = createInputController(canvas);
 
   function recordRunCompletion() {
@@ -69,15 +47,15 @@ function bootstrapEmberglass() {
     if (stars > saveData.bestStars) {
       saveData.bestStars = stars;
     }
-    persistSaveData(saveData);
+    persistProgressionAndSettings(saveData);
   }
 
-  const ui = createOverlayUI(overlayRoot, {
+  const ui = createGameMenus(overlayRoot, {
     onSelectDifficulty(diffId) {
       audio.unlock();
       world.difficulty = diffId;
       saveData.difficulty = diffId;
-      persistSaveData(saveData);
+      persistProgressionAndSettings(saveData);
       ui.forceRefresh();
       ui.sync(world, saveData, audio.muted);
     },
@@ -86,6 +64,31 @@ function bootstrapEmberglass() {
       const nextSeed = params.has('seed') ? Number(params.get('seed')) : undefined;
       startNewRun(world, world.difficulty, nextSeed, effects);
       ui.sync(world, saveData, audio.muted);
+    },
+    onOpenTrials() {
+      world.pendingTrial = null;
+      world.mode = 'trials';
+      ui.sync(world, saveData, audio.muted);
+    },
+    onSelectTrial(trial) {
+      audio.unlock();
+      if (world.pendingTrial) {
+        if (trial !== world.pendingTrial) return;
+        continueTrialProgression(world, effects);
+      } else {
+        if (!isTrialUnlocked(saveData, world.difficulty, trial)) return;
+        startNewRun(world, world.difficulty, urlSeed, effects, trial);
+      }
+      ui.sync(world, saveData, audio.muted);
+    },
+    onRestartTrial() {
+      restartCurrentTrial(world, effects);
+      ui.sync(world, saveData, audio.muted);
+    },
+    onSetVolume(value) {
+      audio.setVolume(value);
+      saveData.volume = audio.volume;
+      persistProgressionAndSettings(saveData);
     },
     onPickTempering(temperingId) {
       audio.unlock();
@@ -100,6 +103,7 @@ function bootstrapEmberglass() {
     },
     onReturnTitle() {
       world.mode = 'title';
+      world.pendingTrial = null;
       effects.clearAll();
       setupTitleAttractScene(world);
       ui.sync(world, saveData, audio.muted);
@@ -107,7 +111,7 @@ function bootstrapEmberglass() {
     onToggleMute() {
       const muted = audio.toggleMute();
       saveData.muted = muted;
-      persistSaveData(saveData);
+      persistProgressionAndSettings(saveData);
       ui.forceRefresh();
       ui.sync(world, saveData, audio.muted);
     },
@@ -119,15 +123,22 @@ function bootstrapEmberglass() {
   function handleGlobalShortcuts(actions) {
     if (actions.mute) {
       saveData.muted = audio.toggleMute();
-      persistSaveData(saveData);
+      persistProgressionAndSettings(saveData);
       ui.forceRefresh();
     }
 
     if (world.mode === 'title') {
+      if (actions.pause) ui.dismissCodex();
       if (actions.confirm) {
         audio.unlock();
         startNewRun(world, world.difficulty, params.has('seed') ? Number(params.get('seed')) : undefined, effects);
       }
+      return;
+    }
+
+    if (world.mode === 'trials') {
+      if (actions.pause) ui.returnToTitle();
+      if (actions.confirm && world.pendingTrial) continueTrialProgression(world, effects);
       return;
     }
 
@@ -148,7 +159,7 @@ function bootstrapEmberglass() {
       if (actions.pause) {
         world.mode = 'playing';
       } else if (actions.restart) {
-        startNewRun(world, world.difficulty, undefined, effects);
+        restartCurrentTrial(world, effects);
       }
       return;
     }
@@ -169,6 +180,9 @@ function bootstrapEmberglass() {
     handleGlobalShortcuts(actions);
 
     stepWorldSimulation(world, actions, FIXED_DT, audio, effects, (newMode) => {
+      if (newMode === 'tempering' || newMode === 'victory' || newMode === 'gameover') {
+        recordTrialResult(saveData, world, newMode !== 'gameover');
+      }
       if (newMode === 'victory' || newMode === 'gameover') {
         recordRunCompletion();
       }
@@ -205,6 +219,17 @@ function bootstrapEmberglass() {
     getState() {
       return {
         mode: world.mode,
+        seed: world.seed,
+        difficulty: world.difficulty,
+        runTime: world.runTime,
+        pendingTrial: world.pendingTrial,
+        trialStartScore: world.trialStartScore,
+        runStartTrial: world.runStartTrial,
+        temperingIds: [...world.temperingIds],
+        modifiers: { ...world.mods },
+        draftChoices: world.draftChoices.map(({ id, name }) => ({ id, name })),
+        progression: structuredClone(saveData.trials),
+        sound: { muted: audio.muted, volume: audio.volume, ...audio.status },
         trial: world.trialIndex,
         score: world.score,
         combo: world.combo,
@@ -212,8 +237,10 @@ function bootstrapEmberglass() {
         comboMultiplier: computeComboMultiplier(world.combo),
         hudMultiplierText: formatComboMultiplier(world.combo),
         hitStopTimer: effects.hitStopTimer,
+        screenFlash: effects.flashAlpha,
         lanternHp: world.lanternHp,
         playerHp: world.player.hp,
+        playerMaxHp: world.player.maxHp,
         prisms: world.prisms.map((p) => ({ x: p.x, y: p.y, kind: p.kind })),
         enemies: world.enemies.map((e) => ({ x: e.x, y: e.y, kind: e.kind, hp: e.hp })),
         pylons: world.pylons.map((p) => ({ x: p.x, y: p.y, hp: p.hp })),
@@ -224,6 +251,7 @@ function bootstrapEmberglass() {
               hp: world.boss.hp,
               maxHp: world.boss.maxHp,
               phase: world.boss.phase,
+              hitFlash: world.boss.hitFlash,
               phaseGuardTimer: world.boss.phaseGuardTimer,
               phasesVisited: [...world.boss.phasesVisited],
             }

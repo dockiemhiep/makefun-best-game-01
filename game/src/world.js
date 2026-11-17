@@ -2,9 +2,10 @@
 
 import { ARENA, DIFFICULTY_MODES, PRISM_ORDER, PRISM_SPECS, TRIAL_WAVES } from './config.js';
 import { createSeededRng } from './rng.js';
-import { computeTemperingModifiers, rollTemperingChoices, TEMPERING_CATALOG } from './temperings.js';
+import { computeTemperingModifiers, rollTemperingChoices } from './temperings.js';
 import { deployPrismNode, recallNearestPrism, refractThroughPrismChain, triggerKilnSupernova } from './prisms.js';
 import { damageTarget, spawnBossVespera, spawnWaveEnemy, updateEnemiesAndBoss } from './enemies.js';
+import { captureTrialEntryCheckpoint } from './progression.js';
 
 export function createEmptyCombatBuffer() {
   return {
@@ -59,7 +60,7 @@ export function createWorldState(initialSeed = 20261116) {
     seed: initialSeed,
     rng,
     entitySeq: 0,
-    mode: 'title', // 'title' | 'playing' | 'tempering' | 'paused' | 'victory' | 'gameover'
+    mode: 'title', // title, trials, playing, tempering, paused, victory, gameover
     difficulty: 'artisan',
     time: 0,
     runTime: 0,
@@ -67,6 +68,10 @@ export function createWorldState(initialSeed = 20261116) {
     combo: 1,
     comboTimer: 0,
     trialIndex: 1,
+    trialStartScore: 0,
+    runStartTrial: 1,
+    pendingTrial: null,
+    trialCheckpoint: null,
     trialBannerTimer: 0,
     spawnQueue: [],
     spawnTimer: 0,
@@ -167,6 +172,7 @@ export function setupTitleAttractScene(world) {
 
 export function beginTrialWave(world, trialNumber, effects) {
   world.trialIndex = trialNumber;
+  world.trialStartScore = world.score;
   world.trialBannerTimer = 2.8;
   const waveDef = TRIAL_WAVES[trialNumber - 1];
   world.spawnQueue.length = 0;
@@ -211,7 +217,7 @@ export function beginTrialWave(world, trialNumber, effects) {
   );
 }
 
-export function startNewRun(world, difficultyId, seed, effects) {
+export function startNewRun(world, difficultyId, seed, effects, startTrial = 1) {
   const cleanSeed = (Number(seed) >>> 0) || ((Date.now() ^ 0x5f3759df) >>> 0);
   world.seed = cleanSeed;
   world.rng = createSeededRng(cleanSeed);
@@ -221,6 +227,9 @@ export function startNewRun(world, difficultyId, seed, effects) {
   effects.clearAll();
 
   world.mode = 'playing';
+  world.runStartTrial = startTrial;
+  world.pendingTrial = null;
+  world.trialCheckpoint = null;
   world.runTime = 0;
   world.score = 0;
   world.combo = 1;
@@ -277,12 +286,13 @@ export function startNewRun(world, difficultyId, seed, effects) {
   deployPrismNode(world, ARENA.centerX, ARENA.centerY - 126, { playPrismDeploy() {} }, effects);
   world.prismCharges = 3;
 
-  beginTrialWave(world, 1, effects);
+  beginTrialWave(world, startTrial, effects);
+  captureTrialEntryCheckpoint(world);
 }
 
 export function chooseTemperingUpgrade(world, temperingId, audio, effects) {
   if (world.mode !== 'tempering') return false;
-  const spec = TEMPERING_CATALOG.find((t) => t.id === temperingId) || world.draftChoices[0];
+  const spec = world.draftChoices.find((t) => t.id === temperingId);
   if (!spec) return false;
 
   world.temperingIds.push(spec.id);
@@ -310,8 +320,22 @@ export function chooseTemperingUpgrade(world, temperingId, audio, effects) {
   audio.playTemperingPick();
   world.draftChoices = [];
   clearCombatBuffer(world);
+  world.mode = 'trials';
+  world.pendingTrial = world.trialIndex + 1;
+  return true;
+}
+
+export function continueTrialProgression(world, effects) {
+  if (world.mode !== 'trials' || !world.pendingTrial) return false;
+  const nextTrial = world.pendingTrial;
+  world.pendingTrial = null;
+  world.bolts.length = 0;
+  world.enemyProjectiles.length = 0;
+  world.shards.length = 0;
+  effects.clearAll();
   world.mode = 'playing';
-  beginTrialWave(world, world.trialIndex + 1, effects);
+  beginTrialWave(world, nextTrial, effects);
+  captureTrialEntryCheckpoint(world);
   return true;
 }
 
@@ -646,7 +670,7 @@ export function stepWorldSimulation(world, actions, dt, audio, effects, onStateC
     : world.spawnQueue.length === 0 && world.enemies.length === 0;
 
   if (trialCleared) {
-    world.stats.trialsCleared = world.trialIndex;
+    world.stats.trialsCleared += 1;
     const integrityBonus = Math.round(world.lanternHp * 6);
     world.score += integrityBonus;
     world.lanternHp = Math.min(world.lanternMaxHp, world.lanternHp + 14);

@@ -1,8 +1,9 @@
-// Accessible DOM overlay screens: Title, Codex, Tempering Draft, Pause, Victory, and Defeat.
+// Accessible game menus: Title, Trial Select, Upgrade Draft, Pause/Settings, Victory, and Defeat.
 
 import { DIFFICULTY_MODES, formatComboMultiplier } from './config.js';
 import { TEMPERING_CATALOG } from './temperings.js';
 import { computeRunStars } from './world.js';
+import { renderTrialSelectScreen } from './trial-select.js';
 
 function escapeHtml(text) {
   return String(text)
@@ -20,7 +21,7 @@ function renderStarsMarkup(litCount) {
   return out;
 }
 
-export function createOverlayUI(rootEl, handlers) {
+export function createGameMenus(rootEl, handlers) {
   let renderedSignature = '';
   let showCodexOnTitle = false;
 
@@ -31,6 +32,8 @@ export function createOverlayUI(rootEl, handlers) {
       showCodexOnTitle ? 'codex1' : 'codex0',
       audioMuted ? 'm1' : 'm0',
       world.trialIndex,
+      world.pendingTrial,
+      JSON.stringify(saveData.trials[world.difficulty]),
       world.score,
       saveData.bestScore,
       saveData.bestStars,
@@ -42,6 +45,12 @@ export function createOverlayUI(rootEl, handlers) {
     const sig = buildSignature(world, saveData, audioMuted);
     if (sig === renderedSignature) return;
     renderedSignature = sig;
+    const previousMode = rootEl.dataset.mode;
+    const active = rootEl.contains(document.activeElement) ? document.activeElement : null;
+    const activeAction = active?.getAttribute('data-action');
+    const activeId = active?.id;
+    rootEl.dataset.mode = world.mode;
+    document.getElementById('game-canvas').inert = world.mode !== 'playing';
 
     if (world.mode === 'playing') {
       rootEl.innerHTML = '';
@@ -50,12 +59,21 @@ export function createOverlayUI(rootEl, handlers) {
 
     if (world.mode === 'title') {
       renderTitleOverlay(world, saveData, audioMuted);
+    } else if (world.mode === 'trials') {
+      rootEl.innerHTML = renderTrialSelectScreen(world, saveData);
+      bindCommonButtons();
     } else if (world.mode === 'tempering') {
       renderTemperingOverlay(world);
     } else if (world.mode === 'paused') {
-      renderPauseOverlay(world, audioMuted);
+      renderPauseSettingsMenu(world, saveData, audioMuted);
     } else if (world.mode === 'victory' || world.mode === 'gameover') {
       renderResultsOverlay(world, saveData);
+    }
+    const target = activeId ? rootEl.querySelector(`#${activeId}`) :
+      activeAction ? rootEl.querySelector(`[data-action="${activeAction}"]`) : null;
+    if (target) target.focus({ preventScroll: true });
+    else if (previousMode !== world.mode || active) {
+      (rootEl.querySelector('[data-focus-first]') || rootEl.querySelector('button:not(:disabled)'))?.focus({ preventScroll: true });
     }
   }
 
@@ -65,7 +83,7 @@ export function createOverlayUI(rootEl, handlers) {
         <section class="overlay-screen compact-modal" aria-label="Crucible Guide">
           <div class="eyebrow-row">
             <span>EMBERGLASS · TACTICAL CODEX</span>
-            <span class="best-pill">5 TRIALS + 3-PHASE BOSS</span>
+            <span class="best-pill">5 TRIALS · FINAL BOSS</span>
           </div>
           <div class="codex-columns">
             <div class="codex-box">
@@ -99,57 +117,30 @@ export function createOverlayUI(rootEl, handlers) {
       )
       .join('');
 
-    const bestStarsText = saveData.bestStars > 0 ? `${'★'.repeat(saveData.bestStars)}${'☆'.repeat(3 - saveData.bestStars)}` : '☆☆☆';
-
     rootEl.innerHTML = `
-      <section class="overlay-screen" aria-label="Emberglass Title Screen">
-        <div class="eyebrow-row">
-          <span>STAINED-GLASS REFRACTION ARENA</span>
-          <span class="best-pill">BEST SCORE: ${saveData.bestScore.toLocaleString('en-US')} · ${bestStarsText}</span>
-        </div>
-
-        <header class="hero-header">
-          <h1 class="game-title">EMBERGLASS</h1>
-          <p class="game-subtitle">
-            Architect a network of stained-glass Prisms around the Heart-Lantern and shoot into them to refract blazing multi-beam combos across 5 Kiln Trials.
-          </p>
-        </header>
-
-        <div class="prism-triptych">
-          <div class="prism-badge-card ruby">
-            <div class="prism-badge-title">◆ Ruby Splitter</div>
-            <div class="prism-badge-desc">Splits bolts into 3 piercing crimson lances + relays chain.</div>
+      <section class="overlay-screen title-screen" aria-label="Emberglass Title Screen">
+        <div class="title-copy">
+          <div class="eyebrow-row">A STAINED-GLASS COMBAT RITUAL</div>
+          <header>
+            <h1 class="game-title" translate="no">EMBERGLASS</h1>
+            <p class="title-mantra">REFRACT THE FLAME.</p>
+          </header>
+          <p class="title-goal">Build a prism web. Defend the Heart-Lantern.<br>Survive five trials. Shatter the Rime Sovereign.</p>
+          <div class="prism-legend"><span class="ruby">◆ SPLIT</span><span class="cyan">⬡ CHAIN</span><span class="topaz">✦ DETONATE</span></div>
+          <div class="difficulty-bar" role="group" aria-label="Select Difficulty">${diffButtons}</div>
+          <div class="cta-row">
+            <button class="btn-primary" id="btn-start-run" data-action="start-run" data-focus-first>START RUN <small>[ENTER]</small></button>
+            <button class="btn-secondary" data-action="open-trials">TRIAL SELECT</button>
           </div>
-          <div class="prism-badge-card cyan">
-            <div class="prism-badge-title">⬡ Tourmaline Arc</div>
-            <div class="prism-badge-desc">Instant lightning relay that slows foes & vaporizes frost orbs.</div>
+          <div class="title-utility">
+            <button class="text-button" data-action="open-codex">HOW TO PLAY</button>
+            <button class="text-button" data-action="toggle-mute">${audioMuted ? 'SOUND OFF [M]' : 'SOUND ON [M]'}</button>
+            <span>BEST ${saveData.bestScore.toLocaleString('en-US')}</span>
           </div>
-          <div class="prism-badge-card topaz">
-            <div class="prism-badge-title">✦ Topaz Sunburst</div>
-            <div class="prism-badge-desc">Detonates a radiant shockwave nova every 2nd refraction.</div>
-          </div>
-        </div>
-
-        <div class="difficulty-bar" role="group" aria-label="Select Difficulty">
-          ${diffButtons}
-        </div>
-
-        <div class="controls-grid">
-          <div class="ctrl-item"><span class="keycap">WASD / ARROWS</span><span class="ctrl-label">Move Vessel</span></div>
-          <div class="ctrl-item"><span class="keycap">LEFT CLICK</span><span class="ctrl-label">Fire Ember Bolt</span></div>
-          <div class="ctrl-item"><span class="keycap">RIGHT CLICK / E</span><span class="ctrl-label">Deploy Prism</span></div>
-          <div class="ctrl-item"><span class="keycap">SPACE / SHIFT</span><span class="ctrl-label">Phase Dash</span></div>
-          <div class="ctrl-item"><span class="keycap">F / 1-2-3</span><span class="ctrl-label">Supernova · Color</span></div>
-        </div>
-
-        <div class="cta-row">
-          <button class="btn-primary" id="btn-start-run" data-action="start-run">START RUN [ENTER]</button>
-          <button class="btn-secondary" data-action="open-codex">CODEX &amp; RULES</button>
-          <button class="btn-secondary" data-action="toggle-mute">${audioMuted ? 'SOUND: OFF' : 'SOUND: ON'}</button>
+          <div class="title-controls"><span><b>WASD</b> MOVE</span><span><b>CLICK</b> FIRE</span><span><b>RMB / E</b> PRISM</span><span><b>SPACE</b> DASH</span><span><b>ESC / P</b> PAUSE</span></div>
         </div>
       </section>
     `;
-
     bindCommonButtons();
   }
 
@@ -161,6 +152,7 @@ export function createOverlayUI(rootEl, handlers) {
           <div>
             <div class="tempering-tag">${escapeHtml(choice.tag)}</div>
             <div class="tempering-name">${escapeHtml(choice.name)}</div>
+            <div class="tempering-effect"><strong>${escapeHtml(choice.effect.split(' ')[0])}</strong><span>${escapeHtml(choice.effect.split(' ').slice(1).join(' '))}</span></div>
             <div class="tempering-desc">${escapeHtml(choice.desc)}</div>
           </div>
           <div class="tempering-pick-hint">FORGE RELIC [${index + 1}]</div>
@@ -170,53 +162,42 @@ export function createOverlayUI(rootEl, handlers) {
       .join('');
 
     rootEl.innerHTML = `
-      <section class="overlay-screen compact-modal" aria-label="Choose a Forged Tempering">
+      <section class="overlay-screen upgrade-screen" aria-label="Choose an upgrade">
         <div class="eyebrow-row">
           <span>TRIAL ${world.trialIndex} CLEARED · KILN FORGE</span>
           <span class="best-pill">SCORE: ${world.score.toLocaleString('en-US')}</span>
         </div>
         <header class="hero-header">
-          <h2 class="result-heading victory" style="font-size: 30px;">CHOOSE A FORGED TEMPERING</h2>
-          <p class="game-subtitle">Select 1 relic to empower your Weaver and Prisms for Trial ${world.trialIndex + 1}.</p>
+          <h2 class="result-heading victory">CHOOSE YOUR UPGRADE</h2>
+          <p class="game-subtitle">Pick one. Its power lasts for every remaining trial.</p>
         </header>
         <div class="draft-grid">
           ${cardsHtml}
         </div>
+        <div class="upgrade-route" aria-label="Run route">${[1,2,3,4,5].map(n => `<span class="${n <= world.trialIndex ? 'done' : ''}">${String(n).padStart(2, '0')} ${n <= world.trialIndex ? 'CLEARED' : n === world.trialIndex + 1 ? 'NEXT' : n === 5 ? 'BOSS' : 'LOCKED'}</span>`).join('<i>→</i>')}</div>
       </section>
     `;
     bindCommonButtons();
   }
 
-  function renderPauseOverlay(world, audioMuted) {
+  function renderPauseSettingsMenu(world, saveData, audioMuted) {
     rootEl.innerHTML = `
-      <section class="overlay-screen compact-modal" aria-label="Game Paused">
-        <div class="eyebrow-row">
-          <span>CRUCIBLE SUSPENDED</span>
-          <span class="best-pill">TRIAL ${world.trialIndex} / 5</span>
+      <section class="overlay-screen pause-screen" role="dialog" aria-modal="true" aria-label="Pause and settings">
+        <div class="eyebrow-row"><span>TRIAL ${world.trialIndex} / 5</span><span>SIMULATION PAUSED</span></div>
+        <h2 class="result-heading">PAUSE / SETTINGS</h2>
+        <div class="settings-row">
+          <label for="sound-volume">SOUND VOLUME <output id="volume-value" for="sound-volume">${Math.round(saveData.volume * 100)}%</output></label>
+          <input id="sound-volume" type="range" min="0" max="100" step="1" value="${Math.round(saveData.volume * 100)}">
+          <button class="btn-secondary" data-action="toggle-mute" aria-pressed="${audioMuted}">${audioMuted ? 'UNMUTE SOUND' : 'MUTE SOUND'}</button>
         </div>
-        <header class="hero-header">
-          <h2 class="result-heading" style="font-size: 32px; color: #ffe6b0;">PAUSED</h2>
-          <p class="game-subtitle">Tip: Place 2 or 3 Prisms in a triangle around the Heart-Lantern so one bolt chains across the entire arena.</p>
-        </header>
-        <div class="codex-columns">
-          <div class="codex-box">
-            <h3>Active Controls</h3>
-            <p><strong>WASD / Arrows</strong>: Move · <strong>Space</strong>: Phase Dash<br>
-            <strong>Left Click</strong>: Shoot · <strong>Right Click / E</strong>: Place Prism<br>
-            <strong>Q</strong>: Recall Prism · <strong>F</strong>: Kiln Supernova</p>
-          </div>
-          <div class="codex-box">
-            <h3>Current Run</h3>
-            <p>Score: <strong>${world.score.toLocaleString('en-US')}</strong> · Peak Multiplier: <strong>${formatComboMultiplier(world.stats.maxCombo)}</strong> (${world.stats.maxCombo} streak)<br>
-            Lantern Warmth: <strong>${Math.ceil(world.lanternHp)}/${world.lanternMaxHp}</strong></p>
-          </div>
-        </div>
+        <p class="game-subtitle">Restart restores this trial's entry score, health and relics.</p>
         <div class="cta-row">
-          <button class="btn-primary" data-action="resume-run">RESUME [ESC]</button>
-          <button class="btn-secondary" data-action="restart-run">RESTART RUN [R]</button>
-          <button class="btn-secondary" data-action="toggle-mute">${audioMuted ? 'SOUND: OFF' : 'SOUND: ON'}</button>
-          <button class="btn-secondary" data-action="return-title">TITLE MENU</button>
+          <button class="btn-primary" data-action="resume-run" data-focus-first>RESUME [ESC / P]</button>
+          <button class="btn-secondary" data-action="restart-trial">RESTART TRIAL [R]</button>
+          <button class="btn-secondary" data-action="return-title">TITLE</button>
         </div>
+        <div class="pause-controls">WASD Move · Click Fire · RMB / E Prism · Q Recall<br>Space Dash · 1 / 2 / 3 Prism color · F Supernova · M Mute</div>
+        <div class="relic-strip">${world.temperingIds.map(id => `<span class="relic-chip">${escapeHtml(TEMPERING_CATALOG.find(t => t.id === id)?.name || id)}</span>`).join('')}</div>
       </section>
     `;
     bindCommonButtons();
@@ -240,13 +221,13 @@ export function createOverlayUI(rootEl, handlers) {
     rootEl.innerHTML = `
       <section class="overlay-screen compact-modal" aria-label="${isVictory ? 'Victory Summary' : 'Defeat Summary'}">
         <div class="eyebrow-row">
-          <span>${isVictory ? 'ALL 5 KILN TRIALS CONQUERED' : `FALLEN ON TRIAL ${world.trialIndex} OF 5`}</span>
+          <span>${isVictory ? (world.runStartTrial === 1 ? 'ALL 5 KILN TRIALS CONQUERED' : 'THE RIME SOVEREIGN DEFEATED') : `FALLEN ON TRIAL ${world.trialIndex} OF 5`}</span>
           <span class="best-pill">${world.isNewBest ? '★ NEW HIGH SCORE! ★' : `BEST: ${saveData.bestScore.toLocaleString('en-US')}`}</span>
         </div>
 
         <div class="result-banner">
           <h2 class="result-heading ${isVictory ? 'victory' : 'defeat'}">
-            ${isVictory ? 'VICTORY — THE KILN ENDURES' : 'CRUCIBLE SHATTERED'}
+            ${isVictory ? 'VICTORY' : 'CRUCIBLE SHATTERED'}
           </h2>
           ${isVictory ? `<div class="stars-row" aria-label="${stars} of 3 stars">${renderStarsMarkup(stars)}</div>` : ''}
           <p class="game-subtitle">
@@ -288,7 +269,8 @@ export function createOverlayUI(rootEl, handlers) {
         <div class="relic-strip">${relicChips}</div>
 
         <div class="cta-row">
-          <button class="btn-primary" id="btn-play-again" data-action="restart-run">PLAY AGAIN [R]</button>
+          <button class="btn-primary" id="btn-play-again" data-action="restart-run" data-focus-first>RESTART RUN [R]</button>
+          <button class="btn-secondary" data-action="open-trials">TRIAL SELECT</button>
           <button class="btn-secondary" data-action="return-title">TITLE SCREEN</button>
         </div>
       </section>
@@ -297,6 +279,14 @@ export function createOverlayUI(rootEl, handlers) {
   }
 
   function bindCommonButtons() {
+    rootEl.querySelectorAll('[data-trial]').forEach(btn => {
+      btn.addEventListener('click', () => handlers.onSelectTrial(Number(btn.dataset.trial)));
+    });
+    const volume = rootEl.querySelector('#sound-volume');
+    volume?.addEventListener('input', () => {
+      handlers.onSetVolume(Number(volume.value) / 100);
+      rootEl.querySelector('#volume-value').value = `${volume.value}%`;
+    });
     rootEl.querySelectorAll('[data-diff]').forEach((btn) => {
       btn.addEventListener('click', () => {
         handlers.onSelectDifficulty(btn.getAttribute('data-diff'));
@@ -315,6 +305,11 @@ export function createOverlayUI(rootEl, handlers) {
         if (action === 'start-run' || action === 'restart-run') {
           showCodexOnTitle = false;
           handlers.onStartRun();
+        } else if (action === 'open-trials') {
+          showCodexOnTitle = false;
+          handlers.onOpenTrials();
+        } else if (action === 'restart-trial') {
+          handlers.onRestartTrial();
         } else if (action === 'resume-run') {
           handlers.onResume();
         } else if (action === 'return-title') {
@@ -339,8 +334,18 @@ export function createOverlayUI(rootEl, handlers) {
     renderedSignature = '';
   }
 
+  rootEl.addEventListener('keydown', (event) => {
+    if (event.key !== 'Tab' || !rootEl.querySelector('[aria-modal="true"]')) return;
+    const controls = [...rootEl.querySelectorAll('button:not(:disabled), input')];
+    const first = controls[0], last = controls.at(-1);
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  });
+
   return {
     sync,
+    returnToTitle: handlers.onReturnTitle,
+    dismissCodex() { showCodexOnTitle = false; renderedSignature = ''; handlers.onRefreshUI(); },
     forceRefresh,
   };
 }

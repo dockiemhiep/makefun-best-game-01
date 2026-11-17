@@ -79,6 +79,11 @@ export function createInputController(canvas) {
   }
 
   function onKeyDown(e) {
+    if (e.isComposing || e.keyCode === 229) return;
+    const target = e.target;
+    const inMenu = Boolean(document.querySelector('#overlay-root button'));
+    if (target?.matches?.('input, select, textarea') && e.code !== 'Escape' && e.code !== 'KeyP') return;
+    if (inMenu && target?.closest?.('button') && (e.code === 'Enter' || e.code === 'Space')) return;
     const code = e.code;
     if (
       code === 'Space' ||
@@ -86,7 +91,7 @@ export function createInputController(canvas) {
       code === 'ArrowDown' ||
       code === 'ArrowLeft' ||
       code === 'ArrowRight' ||
-      code === 'Tab'
+      (code === 'Tab' && !inMenu)
     ) {
       e.preventDefault();
     }
@@ -117,7 +122,7 @@ export function createInputController(canvas) {
         state.prismSelectRequested = 1;
       } else if (code === 'Digit3') {
         state.prismSelectRequested = 2;
-      } else if (code === 'Tab') {
+      } else if (code === 'Tab' && !inMenu) {
         state.cyclePrismRequested += 1;
       }
     }

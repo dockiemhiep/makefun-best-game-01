@@ -38,5 +38,8 @@ export function createSeededRng(initialSeed = 1337) {
     return copy;
   }
 
-  return { next, range, int, chance, pick, shuffle };
+  return { next, range, int, chance, pick, shuffle,
+    getState: () => state,
+    setState: (value) => { state = value | 0; },
+  };
 }

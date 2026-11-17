@@ -591,56 +591,7 @@ function renderCrosshair(ctx, world, inputState) {
   ctx.restore();
 }
 
-function renderTitleSideShowcase(ctx, world) {
-  // Decorative stained-glass wing rosettes on Title Screen so beams visibly flank the title card
-  const columns = [115, ARENA.width - 115];
-  const colors = ['#ff3e6c', '#18e4ff', '#ffd24c'];
-  for (let c = 0; c < columns.length; c++) {
-    const cx = columns[c];
-    const cy = ARENA.centerY;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, 74, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(244, 201, 121, 0.24)';
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-
-    for (let i = 0; i < 3; i++) {
-      const a = world.time * (c === 0 ? 0.7 : -0.7) + (i * Math.PI * 2) / 3;
-      const nx = cx + Math.cos(a) * 54;
-      const ny = cy + Math.sin(a) * 54;
-      const nextA = world.time * (c === 0 ? 0.7 : -0.7) + ((i + 1) * Math.PI * 2) / 3;
-      const nx2 = cx + Math.cos(nextA) * 54;
-      const ny2 = cy + Math.sin(nextA) * 54;
-
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.beginPath();
-      ctx.moveTo(nx, ny);
-      ctx.lineTo(nx2, ny2);
-      ctx.strokeStyle = colors[i];
-      ctx.globalAlpha = 0.55;
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.globalCompositeOperation = 'source-over';
-
-      drawPolygon(ctx, nx, ny, 12, 4 + i * 2, a);
-      ctx.fillStyle = colors[i];
-      ctx.fill();
-      ctx.strokeStyle = '#fff6df';
-      ctx.lineWidth = 1.6;
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-}
-
 function renderWingHud(ctx, world, saveData, audioMuted) {
-  if (world.mode === 'title') {
-    renderTitleSideShowcase(ctx, world);
-    return;
-  }
-
   ctx.save();
   if (world.mode !== 'playing') {
     ctx.globalAlpha = 0.22;
@@ -662,11 +613,11 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
 
   const lanternPct = Math.max(0, world.lanternHp / Math.max(1, world.lanternMaxHp));
   ctx.fillStyle = '#f4c979';
-  ctx.font = '800 11.5px "Avenir Next", "Segoe UI", sans-serif';
-  ctx.fillText('HEART-LANTERN WARMTH', lx + 14, 42);
+  ctx.font = '800 20px "Avenir Next", "Segoe UI", sans-serif';
+  ctx.fillText('INTEGRITY', lx + 14, 42);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#fff6df';
-  ctx.font = '900 16px "Avenir Next", "Segoe UI", sans-serif';
+  ctx.font = '900 22px "Avenir Next", "Segoe UI", sans-serif';
   ctx.fillText(`${Math.ceil(world.lanternHp)} / ${world.lanternMaxHp}`, lx + lw - 14, 43);
   ctx.textAlign = 'left';
 
@@ -722,11 +673,11 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
   ctx.stroke();
 
   ctx.fillStyle = '#f4c979';
-  ctx.font = '800 11.5px "Avenir Next", "Segoe UI", sans-serif';
-  ctx.fillText('PRISM CHARGES [RMB / E]', lx + 14, 226);
+  ctx.font = '800 16px "Avenir Next", "Segoe UI", sans-serif';
+  ctx.fillText('PRISMS [E]', lx + 14, 226);
   ctx.textAlign = 'right';
   ctx.fillStyle = '#fff6df';
-  ctx.font = '800 13px "Avenir Next", "Segoe UI", sans-serif';
+  ctx.font = '800 16px "Avenir Next", "Segoe UI", sans-serif';
   ctx.fillText(`${world.prisms.length}/${world.mods.maxPrisms} ACTIVE`, lx + lw - 14, 226);
   ctx.textAlign = 'left';
 
@@ -778,12 +729,12 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
   ctx.stroke();
 
   ctx.fillStyle = novaReady ? '#ffe27a' : '#f4c979';
-  ctx.font = '800 11.5px "Avenir Next", "Segoe UI", sans-serif';
-  ctx.fillText('KILN SUPERNOVA [F]', lx + 14, 352);
+  ctx.font = '800 16px "Avenir Next", "Segoe UI", sans-serif';
+  ctx.fillText('SUPERNOVA [F]', lx + 14, 352);
   ctx.textAlign = 'right';
   ctx.fillStyle = novaReady ? '#38e2b2' : '#fff6df';
   ctx.font = '900 13px "Avenir Next", "Segoe UI", sans-serif';
-  ctx.fillText(novaReady ? 'READY — PRESS F!' : `${Math.floor(world.novaCharge)}%`, lx + lw - 14, 352);
+  ctx.fillText(novaReady ? 'READY' : `${Math.floor(world.novaCharge)}%`, lx + lw - 14, 352);
   ctx.textAlign = 'left';
 
   drawRoundedPanel(ctx, lx + 14, 364, lw - 28, 14, 7);
@@ -847,7 +798,7 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
   ctx.fillText(`SCORE · ${diffLabel}`, rx + 14, 42);
 
   ctx.fillStyle = '#fff8e6';
-  ctx.font = '900 32px "Avenir Next", "Segoe UI", sans-serif';
+  ctx.font = '900 42px "Avenir Next", "Segoe UI", sans-serif';
   ctx.fillText(world.score.toLocaleString('en-US'), rx + 14, 78);
 
   const liveBest = Math.max(saveData.bestScore || 0, world.score);
@@ -865,8 +816,8 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
   ctx.stroke();
 
   ctx.fillStyle = '#f4c979';
-  ctx.font = '800 11.5px "Avenir Next", "Segoe UI", sans-serif';
-  ctx.fillText('RESONANCE MULTIPLIER', rx + 14, 148);
+  ctx.font = '800 18px "Avenir Next", "Segoe UI", sans-serif';
+  ctx.fillText('RESONANCE', rx + 14, 148);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#9aa6c4';
@@ -875,7 +826,7 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
   ctx.textAlign = 'left';
 
   ctx.fillStyle = world.combo >= 8 ? '#ffd24c' : world.combo >= 4 ? '#18e4ff' : '#e6ecf8';
-  ctx.font = '900 28px "Avenir Next", "Segoe UI", sans-serif';
+  ctx.font = '900 38px "Avenir Next", "Segoe UI", sans-serif';
   ctx.fillText(formatComboMultiplier(world.combo), rx + 14, 182);
 
   ctx.textAlign = 'right';
@@ -994,10 +945,10 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
 
   // ================= TOP-CENTER BOSS OR TRIAL BANNER =================
   if (world.boss && world.boss.hp > 0) {
-    const bw = 540;
+    const bw = 584;
     const bx = ARENA.centerX - bw / 2;
-    const by = 14;
-    drawRoundedPanel(ctx, bx, by, bw, 46, 10);
+    const by = 8;
+    drawRoundedPanel(ctx, bx, by, bw, 58, 10);
     ctx.fillStyle = 'rgba(18, 14, 34, 0.92)';
     ctx.fill();
     ctx.strokeStyle = '#ff6384';
@@ -1005,19 +956,22 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
     ctx.stroke();
 
     ctx.fillStyle = '#ffe5ec';
-    ctx.font = '900 12.5px "Avenir Next", "Segoe UI", sans-serif';
-    ctx.fillText(`${world.boss.name.toUpperCase()} · PHASE ${world.boss.phase}/3`, bx + 16, by + 19);
-
+    ctx.font = '900 30px "Avenir Next", "Segoe UI", sans-serif';
+    ctx.fillText('VESPERA', bx + 16, by + 31);
     ctx.textAlign = 'right';
     ctx.fillStyle = '#8ce8ff';
-    ctx.fillText(`${Math.ceil(world.boss.hp)} / ${world.boss.maxHp}`, bx + bw - 16, by + 19);
+    ctx.font = '900 28px "Avenir Next", "Segoe UI", sans-serif';
+    ctx.fillText(`PHASE ${world.boss.phase}/3`, bx + bw - 16, by + 31);
+    ctx.textAlign = 'center';
+    ctx.font = '700 12px "Avenir Next", "Segoe UI", sans-serif';
+    ctx.fillText(`${Math.ceil(world.boss.hp)} / ${world.boss.maxHp}`, ARENA.centerX, by + 29);
     ctx.textAlign = 'left';
 
     const bossPct = Math.max(0, world.boss.hp / world.boss.maxHp);
-    drawRoundedPanel(ctx, bx + 16, by + 26, bw - 32, 11, 5);
+    drawRoundedPanel(ctx, bx + 16, by + 39, bw - 32, 11, 5);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.fill();
-    drawRoundedPanel(ctx, bx + 16, by + 26, Math.max(8, (bw - 32) * bossPct), 11, 5);
+    drawRoundedPanel(ctx, bx + 16, by + 39, Math.max(8, (bw - 32) * bossPct), 11, 5);
     const bGrad = ctx.createLinearGradient(bx + 16, 0, bx + bw - 16, 0);
     bGrad.addColorStop(0, '#ff3e6c');
     bGrad.addColorStop(1, '#9b7ede');
@@ -1028,7 +982,7 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
     ctx.fillStyle = 'rgba(255, 246, 223, 0.85)';
     for (const gate of [0.34, 0.66]) {
       const gx = bx + 16 + (bw - 32) * gate;
-      ctx.fillRect(gx - 1, by + 25, 2, 13);
+      ctx.fillRect(gx - 1, by + 38, 2, 13);
     }
   } else if (world.mode === 'playing') {
     const bw = 580;
@@ -1056,7 +1010,54 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
   ctx.restore();
 }
 
+// The title's rose window is original live Canvas geometry, built from the combat palette.
+function renderTitleStainedGlass(ctx, world) {
+  ctx.fillStyle = '#080d18';
+  ctx.fillRect(0, 0, ARENA.width, ARENA.height);
+  const cx = 962, cy = 350, radius = 238;
+  const halo = ctx.createRadialGradient(cx, cy, 40, cx, cy, 370);
+  halo.addColorStop(0, '#253953'); halo.addColorStop(.65, '#111e32'); halo.addColorStop(1, '#080d18');
+  ctx.fillStyle = halo; ctx.fillRect(650, 0, 630, 720);
+  const colors = ['#e64b6b', '#ef9442', '#eac366', '#38bfc9', '#3c819d', '#a13e72'];
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.strokeStyle = '#101827'; ctx.lineWidth = 5;
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6 - Math.PI / 2;
+    const b = a + Math.PI / 6;
+    const mid = (a + b) / 2;
+    const point = (angle, r) => [Math.cos(angle) * r, Math.sin(angle) * r];
+    const polygons = [
+      [point(a, 72), point(mid, 158), point(b, 72)],
+      [point(a, 72), point(a, radius), point(mid, 158)],
+      [point(b, 72), point(mid, 158), point(b, radius)],
+      [point(a, radius), point(mid, 158), point(b, radius)],
+    ];
+    polygons.forEach((vertices, j) => {
+      ctx.beginPath(); vertices.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
+      ctx.fillStyle = colors[(i + j) % colors.length]; ctx.globalAlpha = j === 0 ? .95 : .62 + Math.sin(i * 3 + j) * .15;
+      ctx.fill(); ctx.globalAlpha = 1; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(...vertices[0]); ctx.lineTo(...vertices[1]);
+      ctx.strokeStyle = 'rgba(255, 239, 196, .28)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = '#101827'; ctx.lineWidth = 5;
+    });
+  }
+  for (const r of [radius + 2, radius + 14, 73]) {
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.strokeStyle = '#d6ac67'; ctx.lineWidth = r === radius + 2 ? 4 : 1.5; ctx.stroke();
+  }
+  // The Heart-Lantern floats in the window's central, brass-set aperture.
+  drawPolygon(ctx, 0, 0, 61, 8, Math.PI / 8); ctx.fillStyle = '#182339'; ctx.fill(); ctx.strokeStyle = '#f4c979'; ctx.lineWidth = 3; ctx.stroke();
+  const pulse = 1 + Math.sin(world.time * 2) * .025;
+  drawPolygon(ctx, 0, 0, 44 * pulse, 4, 0); ctx.fillStyle = '#ffb849'; ctx.fill();
+  drawPolygon(ctx, 0, 0, 24, 4, 0); ctx.fillStyle = '#fff2cd'; ctx.fill();
+  ctx.restore();
+  ctx.font = '700 12px "Avenir Next", "Segoe UI", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#c6a574';
+  ctx.fillText('THE HEART-LANTERN', cx, 652);
+  ctx.font = '500 11px "Avenir Next", "Segoe UI", sans-serif'; ctx.fillStyle = '#8f9eba';
+  ctx.fillText('A flame worth defending.', cx, 674); ctx.textAlign = 'left';
+}
+
 export function renderGameFrame(ctx, world, effects, inputState, saveData, audioMuted) {
+  if (world.mode === 'title') { renderTitleStainedGlass(ctx, world); return; }
   ctx.save();
   ctx.translate(effects.shakeX, effects.shakeY);
 

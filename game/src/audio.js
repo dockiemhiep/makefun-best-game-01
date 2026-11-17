@@ -21,6 +21,7 @@ export function createSoundEngine() {
   let ctx = null;
   let masterGain = null;
   let muted = false;
+  let soundVolume = 1;
   let musicClock = 0;
   let musicStep = 0;
 
@@ -32,7 +33,7 @@ export function createSoundEngine() {
       try {
         ctx = new AudioCtor();
         masterGain = ctx.createGain();
-        masterGain.gain.value = 0.26;
+        masterGain.gain.value = muted ? 0 : 0.26 * soundVolume;
         masterGain.connect(ctx.destination);
       } catch {
         ctx = null;
@@ -161,19 +162,32 @@ export function createSoundEngine() {
   }
 
   function toggleMute() {
-    muted = !muted;
+    setMuted(!muted);
     return muted;
   }
 
   function setMuted(flag) {
     muted = Boolean(flag);
+    updateMasterVolume();
+  }
+
+  function updateMasterVolume() {
+    if (ctx && masterGain) masterGain.gain.setValueAtTime(muted ? 0 : soundVolume * 0.26, ctx.currentTime);
+  }
+
+  function setVolume(value) {
+    soundVolume = Math.max(0, Math.min(1, Number(value) || 0));
+    updateMasterVolume();
   }
 
   return {
     get muted() { return muted; },
+    get volume() { return soundVolume; },
+    get status() { return { context: ctx?.state || 'locked', gain: masterGain?.gain.value ?? 0 }; },
     unlock: ensureContext,
     toggleMute,
     setMuted,
+    setVolume,
     playBoltFire,
     playPrismDeploy,
     playPrismRefract,

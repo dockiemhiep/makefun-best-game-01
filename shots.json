@@ -1,6 +1,6 @@
 [
-  { "name": "1-play.jpg", "query": "?seed=20261116", "scene": "trial-2-prism-refraction-combat" },
-  { "name": "2-title.jpg", "query": "?seed=20261116", "scene": "title-screen" },
-  { "name": "3-boss.jpg", "query": "?seed=20261116", "scene": "trial-5-vespera-phase-2-cryo-pylons" },
+  { "name": "1-title.jpg", "query": "?seed=20261116", "scene": "title-screen-stained-glass-heart-lantern" },
+  { "name": "2-boss.jpg", "query": "?seed=20261116", "scene": "trial-5-vespera-phase-2-cryo-pylons-hud" },
+  { "name": "3-trials.jpg", "query": "?seed=20261116", "scene": "trial-2-cleared-three-upgrade-choices-and-progression" },
   { "name": "4-victory.jpg", "query": "?seed=20261116", "scene": "victory-summary-and-restart" }
 ]
