@@ -1,9 +1,11 @@
 // EMBERGLASS main bootstrap: fixed 60 Hz simulation step, persistence, and state orchestration.
 
+import { computeComboMultiplier, formatComboMultiplier } from './config.js';
 import { createInputController } from './input.js';
 import { createSoundEngine } from './audio.js';
 import { createEffectsSystem } from './effects.js';
 import {
+  bufferCombatActions,
   chooseTemperingUpgrade,
   computeRunStars,
   createWorldState,
@@ -159,7 +161,11 @@ function bootstrapEmberglass() {
   }
 
   function advanceOneFixedStep() {
+    const wasPlaying = world.mode === 'playing';
     const actions = input.consumeFrameActions();
+    if (wasPlaying) {
+      bufferCombatActions(world, actions);
+    }
     handleGlobalShortcuts(actions);
 
     stepWorldSimulation(world, actions, FIXED_DT, audio, effects, (newMode) => {
@@ -203,18 +209,31 @@ function bootstrapEmberglass() {
         score: world.score,
         combo: world.combo,
         maxCombo: world.stats.maxCombo,
+        comboMultiplier: computeComboMultiplier(world.combo),
+        hudMultiplierText: formatComboMultiplier(world.combo),
+        hitStopTimer: effects.hitStopTimer,
         lanternHp: world.lanternHp,
         playerHp: world.player.hp,
         prisms: world.prisms.map((p) => ({ x: p.x, y: p.y, kind: p.kind })),
         enemies: world.enemies.map((e) => ({ x: e.x, y: e.y, kind: e.kind, hp: e.hp })),
         pylons: world.pylons.map((p) => ({ x: p.x, y: p.y, hp: p.hp })),
-        boss: world.boss ? { x: world.boss.x, y: world.boss.y, hp: world.boss.hp, phase: world.boss.phase } : null,
+        boss: world.boss
+          ? {
+              x: world.boss.x,
+              y: world.boss.y,
+              hp: world.boss.hp,
+              maxHp: world.boss.maxHp,
+              phase: world.boss.phase,
+              phaseGuardTimer: world.boss.phaseGuardTimer,
+              phasesVisited: [...world.boss.phasesVisited],
+            }
+          : null,
         player: { x: world.player.x, y: world.player.y, dashCooldown: world.player.dashCooldown },
         shards: world.shards.map((s) => ({ x: s.x, y: s.y })),
         novaCharge: world.novaCharge,
         prismCharges: world.prismCharges,
         beamCount: effects.beams.length,
-        stats: { ...world.stats },
+        stats: { ...world.stats, bossPhasesSeen: [...world.stats.bossPhasesSeen] },
       };
     },
     stepFrames(count = 1) {

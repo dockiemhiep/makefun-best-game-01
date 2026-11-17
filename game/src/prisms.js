@@ -33,31 +33,33 @@ export function deployPrismNode(world, rawX, rawY, audio, effects) {
     return false;
   }
 
-  // Allow free reposition by recycling oldest prism if charges are empty, or spend 1 charge
-  if (world.prismCharges >= 1) {
-    world.prismCharges -= 1;
-  } else if (world.prisms.length > 0) {
-    const recycled = world.prisms.shift();
-    effects.spawnGlassShards(recycled.x, recycled.y, PRISM_SPECS[recycled.kind].color, 8, 0.7);
-  }
-
-  if (world.prisms.length >= world.mods.maxPrisms) {
-    const oldest = world.prisms.shift();
-    effects.spawnGlassShards(oldest.x, oldest.y, PRISM_SPECS[oldest.kind].color, 8, 0.7);
-  }
-
   let pos = clampPrismPosition(rawX, rawY);
   const kind = PRISM_ORDER[world.selectedPrismIndex % PRISM_ORDER.length];
   const spec = PRISM_SPECS[kind];
   const maxDurability = spec.maxDurability + world.mods.prismDurabilityBonus;
 
-  // Prevent accidental overlapping prisms: if deployed right on an existing prism, replace it in place;
-  // if slightly too close (< 84px), nudge angularly around the Lantern for clean triad geometry.
+  // Resolve overlap BEFORE capacity/recycling eviction: replacing an overlapped node removes
+  // only that node, whereas capacity/recycling eviction happens only for an additional placement.
   const exactOverlapIdx = world.prisms.findIndex((p) => Math.hypot(p.x - pos.x, p.y - pos.y) < 38);
   if (exactOverlapIdx !== -1) {
-    world.prisms.splice(exactOverlapIdx, 1);
+    if (world.prismCharges >= 1) {
+      world.prismCharges -= 1;
+    }
+    const [replaced] = world.prisms.splice(exactOverlapIdx, 1);
+    effects.spawnGlassShards(replaced.x, replaced.y, PRISM_SPECS[replaced.kind].color, 8, 0.7);
   } else {
-    for (let attempt = 0; attempt < 5; attempt++) {
+    if (world.prismCharges >= 1) {
+      world.prismCharges -= 1;
+      if (world.prisms.length >= world.mods.maxPrisms) {
+        const oldest = world.prisms.shift();
+        effects.spawnGlassShards(oldest.x, oldest.y, PRISM_SPECS[oldest.kind].color, 8, 0.7);
+      }
+    } else if (world.prisms.length > 0) {
+      const recycled = world.prisms.shift();
+      effects.spawnGlassShards(recycled.x, recycled.y, PRISM_SPECS[recycled.kind].color, 8, 0.7);
+    }
+
+    for (let attempt = 0; attempt < 6; attempt++) {
       const crowded = world.prisms.find((p) => Math.hypot(p.x - pos.x, p.y - pos.y) < 84);
       if (!crowded) break;
       const baseAngle = Math.atan2(pos.y - ARENA.centerY, pos.x - ARENA.centerX) + 0.58;

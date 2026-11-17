@@ -1,6 +1,13 @@
 // Six enemy archetypes, directional armor physics, and 3-phase Boss Vespera, The Rime Sovereign.
 
-import { ARENA, BOSS_SPEC, DIFFICULTY_MODES, ENEMY_SPECS } from './config.js';
+import {
+  ARENA,
+  BOSS_SPEC,
+  computeComboMultiplier,
+  DIFFICULTY_MODES,
+  ENEMY_SPECS,
+  formatComboMultiplier,
+} from './config.js';
 
 function normalizeAngle(a) {
   while (a > Math.PI) a -= Math.PI * 2;
@@ -72,6 +79,8 @@ export function spawnBossVespera(world) {
     hp: maxHp,
     maxHp,
     phase: 1,
+    phaseGuardTimer: 0,
+    phasesVisited: [1],
     shieldAngle: 0,
     fireTimer: 1.8,
     summonTimer: 4.4,
@@ -81,6 +90,9 @@ export function spawnBossVespera(world) {
     slowTimer: 0,
     hitFlash: 0,
   };
+  if (world.stats) {
+    world.stats.bossPhasesSeen = [1];
+  }
   return world.boss;
 }
 
@@ -102,10 +114,46 @@ function spawnCryoPylons(world, effects) {
       radius: 17,
       hp: maxHp,
       maxHp,
+      spawnGuardTimer: 0.45,
       hitFlash: 0,
       pulse: i * 1.4,
     });
     effects.addShockwave(px, py, 54, '#8ce8ff', 3, 0.32);
+  }
+}
+
+function transitionBossToPhase(world, boss, nextPhase, audio, effects) {
+  if (!boss || boss.phase >= nextPhase) return;
+  boss.phase = nextPhase;
+  if (!boss.phasesVisited.includes(nextPhase)) {
+    boss.phasesVisited.push(nextPhase);
+  }
+  if (world.stats && Array.isArray(world.stats.bossPhasesSeen) && !world.stats.bossPhasesSeen.includes(nextPhase)) {
+    world.stats.bossPhasesSeen.push(nextPhase);
+  }
+  boss.phaseGuardTimer = 1.05;
+  boss.slowTimer = 0;
+
+  if (nextPhase === 2) {
+    spawnCryoPylons(world, effects);
+    audio.playBossPhase();
+    effects.triggerShake(9);
+    effects.triggerHitStop(0.035);
+    effects.addShockwave(boss.x, boss.y, 165, '#8ce8ff', 4.5, 0.42);
+    effects.addCallout(boss.x, boss.y - 40, 'PHASE II · CRYO PYLONS!', '#8ce8ff', 1.25);
+  } else if (nextPhase === 3) {
+    for (const p of world.pylons) {
+      effects.spawnGlassShards(p.x, p.y, '#8ce8ff', 12, 0.9);
+    }
+    world.pylons.length = 0;
+    audio.playBossPhase();
+    effects.triggerShake(10);
+    effects.triggerHitStop(0.035);
+    effects.addShockwave(boss.x, boss.y, 185, '#ff6384', 5, 0.46);
+    boss.sweepState = 'telegraph';
+    boss.sweepTimer = 0.95;
+    boss.sweepAngle = Math.atan2(world.player.y - boss.y, world.player.x - boss.x);
+    effects.addCallout(boss.x, boss.y - 40, 'PHASE III · ABSOLUTE ZERO!', '#ff6384', 1.3);
   }
 }
 
@@ -133,7 +181,7 @@ export function registerComboScore(world, basePoints, x, y, labelPrefix, color, 
     world.stats.maxCombo = world.combo;
   }
 
-  const mult = 1 + (world.combo - 1) * 0.25;
+  const mult = computeComboMultiplier(world.combo);
   const gained = Math.round(basePoints * diff.scoreMult * mult);
   world.score += gained;
 
@@ -144,13 +192,23 @@ export function registerComboScore(world, basePoints, x, y, labelPrefix, color, 
   const tag = labelPrefix
     ? `${labelPrefix} +${gained}`
     : world.combo >= 3
-      ? `x${world.combo} +${gained}`
+      ? `${formatComboMultiplier(world.combo)} +${gained}`
       : `+${gained}`;
   effects.addCallout(x, y - 14, tag, color, world.combo >= 6 ? 1.14 : 0.96);
 }
 
 export function damageTarget(world, target, rawDamage, hitAngle, meta, audio, effects) {
   if (!target || target.hp <= 0) return false;
+
+  // Prevent residual hits of the same attack chain from wiping newly summoned Pylons or skipping Boss phases
+  if (target.isPylon && target.spawnGuardTimer > 0) {
+    target.hitFlash = 0.08;
+    return false;
+  }
+  if (target.isBoss && target.phaseGuardTimer > 0) {
+    target.hitFlash = 0.08;
+    return false;
+  }
 
   let finalDamage = rawDamage;
   let calloutPrefix = '';
@@ -183,9 +241,33 @@ export function damageTarget(world, target, rawDamage, hitAngle, meta, audio, ef
     }
   }
 
-  // Cryo Pylons protect Boss Vespera in Phase 2 (55% damage reduction until shattered)
+  // Cryo Pylons protect Boss Vespera in Phase 2 (72% damage reduction until shattered)
   if (target.isBoss && world.pylons.length > 0) {
-    finalDamage *= 0.45;
+    finalDamage *= 0.28;
+  }
+
+  // Clamp Boss Vespera damage at the 66% and 34% phase boundaries and transition inside damage resolution
+  if (target.isBoss) {
+    const phase2Boundary = target.maxHp * 0.66;
+    const phase3Boundary = target.maxHp * 0.34;
+    if (target.phase === 1 && target.hp - finalDamage <= phase2Boundary) {
+      target.hp = phase2Boundary;
+      target.hitFlash = 0.16;
+      if (meta.refracted) {
+        world.comboTimer = Math.max(world.comboTimer, 2.8);
+      }
+      transitionBossToPhase(world, target, 2, audio, effects);
+      return false;
+    }
+    if (target.phase === 2 && target.hp - finalDamage <= phase3Boundary) {
+      target.hp = phase3Boundary;
+      target.hitFlash = 0.16;
+      if (meta.refracted) {
+        world.comboTimer = Math.max(world.comboTimer, 2.8);
+      }
+      transitionBossToPhase(world, target, 3, audio, effects);
+      return false;
+    }
   }
 
   target.hp -= finalDamage;
@@ -411,6 +493,7 @@ export function updateEnemiesAndBoss(world, dt, audio, effects) {
   if (world.pylons.length > 0 && world.mode === 'playing') {
     for (const p of world.pylons) {
       if (p.hitFlash > 0) p.hitFlash = Math.max(0, p.hitFlash - dt);
+      if (p.spawnGuardTimer > 0) p.spawnGuardTimer = Math.max(0, p.spawnGuardTimer - dt);
       p.pulse += dt * 3;
     }
     world.lanternHp = Math.max(0, world.lanternHp - world.pylons.length * 0.85 * dt);
@@ -421,19 +504,13 @@ export function updateEnemiesAndBoss(world, dt, audio, effects) {
   if (boss && boss.hp > 0) {
     if (boss.hitFlash > 0) boss.hitFlash = Math.max(0, boss.hitFlash - dt);
     if (boss.slowTimer > 0) boss.slowTimer = Math.max(0, boss.slowTimer - dt);
+    if (boss.phaseGuardTimer > 0) boss.phaseGuardTimer = Math.max(0, boss.phaseGuardTimer - dt);
 
     const hpRatio = boss.hp / boss.maxHp;
     if (boss.phase === 1 && hpRatio <= 0.66) {
-      boss.phase = 2;
-      spawnCryoPylons(world, effects);
-      audio.playBossPhase();
-      effects.triggerShake(9);
-      effects.addCallout(boss.x, boss.y - 40, 'PHASE II · CRYO PYLONS!', '#8ce8ff', 1.25);
+      transitionBossToPhase(world, boss, 2, audio, effects);
     } else if (boss.phase === 2 && hpRatio <= 0.34) {
-      boss.phase = 3;
-      audio.playBossPhase();
-      effects.triggerShake(10);
-      effects.addCallout(boss.x, boss.y - 40, 'PHASE III · ABSOLUTE ZERO!', '#ff6384', 1.3);
+      transitionBossToPhase(world, boss, 3, audio, effects);
     }
 
     const orbitSpeed = (boss.phase === 3 ? 0.68 : 0.46) * (boss.slowTimer > 0 ? 0.6 : 1.0);

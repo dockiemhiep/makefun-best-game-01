@@ -6,6 +6,53 @@ import { computeTemperingModifiers, rollTemperingChoices, TEMPERING_CATALOG } fr
 import { deployPrismNode, recallNearestPrism, refractThroughPrismChain, triggerKilnSupernova } from './prisms.js';
 import { damageTarget, spawnBossVespera, spawnWaveEnemy, updateEnemiesAndBoss } from './enemies.js';
 
+export function createEmptyCombatBuffer() {
+  return {
+    deployPrism: false,
+    deployAimX: null,
+    deployAimY: null,
+    recallPrism: false,
+    recallAimX: null,
+    recallAimY: null,
+    dash: false,
+    nova: false,
+    prismSelect: null,
+    cyclePrism: 0,
+  };
+}
+
+export function clearCombatBuffer(world) {
+  world.combatBuffer = createEmptyCombatBuffer();
+}
+
+export function bufferCombatActions(world, actions) {
+  if (!actions || actions._combatBuffered) return;
+  actions._combatBuffered = true;
+  const buf = world.combatBuffer;
+  if (actions.prismSelect !== null && actions.prismSelect !== undefined) {
+    buf.prismSelect = actions.prismSelect;
+  }
+  if (actions.cyclePrism) {
+    buf.cyclePrism += actions.cyclePrism;
+  }
+  if (actions.deployPrism) {
+    buf.deployPrism = true;
+    buf.deployAimX = actions.deployAimX ?? actions.aimX;
+    buf.deployAimY = actions.deployAimY ?? actions.aimY;
+  }
+  if (actions.recallPrism) {
+    buf.recallPrism = true;
+    buf.recallAimX = actions.recallAimX ?? actions.aimX;
+    buf.recallAimY = actions.recallAimY ?? actions.aimY;
+  }
+  if (actions.dash) {
+    buf.dash = true;
+  }
+  if (actions.nova) {
+    buf.nova = true;
+  }
+}
+
 export function createWorldState(initialSeed = 20261116) {
   const rng = createSeededRng(initialSeed);
   const world = {
@@ -53,6 +100,7 @@ export function createWorldState(initialSeed = 20261116) {
     prismCharges: 3,
     maxPrismCharges: 3,
     novaCharge: 25,
+    combatBuffer: createEmptyCombatBuffer(),
 
     temperingIds: [],
     mods: computeTemperingModifiers([]),
@@ -75,6 +123,7 @@ export function createWorldState(initialSeed = 20261116) {
       maxCombo: 1,
       supernovasCast: 0,
       trialsCleared: 0,
+      bossPhasesSeen: [],
     },
   };
 
@@ -83,6 +132,7 @@ export function createWorldState(initialSeed = 20261116) {
 }
 
 export function setupTitleAttractScene(world) {
+  clearCombatBuffer(world);
   world.prisms.length = 0;
   world.bolts.length = 0;
   world.enemies.length = 0;
@@ -203,6 +253,7 @@ export function startNewRun(world, difficultyId, seed, effects) {
   world.maxPrismCharges = 3;
   world.prismCharges = 3;
   world.novaCharge = 30;
+  clearCombatBuffer(world);
 
   world.prisms.length = 0;
   world.bolts.length = 0;
@@ -219,6 +270,7 @@ export function startNewRun(world, difficultyId, seed, effects) {
     maxCombo: 1,
     supernovasCast: 0,
     trialsCleared: 0,
+    bossPhasesSeen: [],
   };
 
   // Gift one opening Topaz Prism north of the Heart-Lantern so refraction works from shot #1!
@@ -257,6 +309,7 @@ export function chooseTemperingUpgrade(world, temperingId, audio, effects) {
 
   audio.playTemperingPick();
   world.draftChoices = [];
+  clearCombatBuffer(world);
   world.mode = 'playing';
   beginTrialWave(world, world.trialIndex + 1, effects);
   return true;
@@ -325,9 +378,15 @@ export function stepWorldSimulation(world, actions, dt, audio, effects, onStateC
     return;
   }
 
+  // Buffer one-shot combat inputs across hit-stop freeze frames until the first accepting tick
+  bufferCombatActions(world, actions);
+
   if (effects.consumeHitStop(dt)) {
     return;
   }
+
+  const pending = world.combatBuffer;
+  world.combatBuffer = createEmptyCombatBuffer();
 
   world.time += dt;
   world.runTime += dt;
@@ -343,22 +402,35 @@ export function stepWorldSimulation(world, actions, dt, audio, effects, onStateC
   }
 
   // Prism selection & placement controls
-  if (actions.prismSelect !== null) {
-    world.selectedPrismIndex = actions.prismSelect % PRISM_ORDER.length;
+  if (pending.prismSelect !== null) {
+    world.selectedPrismIndex = pending.prismSelect % PRISM_ORDER.length;
     world.autoCyclePrisms = false;
-  } else if (actions.cyclePrism !== 0) {
+  } else if (pending.cyclePrism !== 0) {
     world.selectedPrismIndex =
-      (world.selectedPrismIndex + actions.cyclePrism + PRISM_ORDER.length) % PRISM_ORDER.length;
+      (((world.selectedPrismIndex + pending.cyclePrism) % PRISM_ORDER.length) + PRISM_ORDER.length) %
+      PRISM_ORDER.length;
     world.autoCyclePrisms = false;
   }
 
-  if (actions.deployPrism) {
-    deployPrismNode(world, actions.aimX, actions.aimY, audio, effects);
+  if (pending.deployPrism) {
+    deployPrismNode(
+      world,
+      pending.deployAimX ?? actions.aimX,
+      pending.deployAimY ?? actions.aimY,
+      audio,
+      effects,
+    );
   }
-  if (actions.recallPrism) {
-    recallNearestPrism(world, actions.aimX, actions.aimY, audio, effects);
+  if (pending.recallPrism) {
+    recallNearestPrism(
+      world,
+      pending.recallAimX ?? actions.aimX,
+      pending.recallAimY ?? actions.aimY,
+      audio,
+      effects,
+    );
   }
-  if (actions.nova) {
+  if (pending.nova) {
     triggerKilnSupernova(world, audio, effects);
   }
 
@@ -370,7 +442,7 @@ export function stepWorldSimulation(world, actions, dt, audio, effects, onStateC
 
   player.angle = Math.atan2(actions.aimY - player.y, actions.aimX - player.x);
 
-  if (actions.dash && player.dashCooldown <= 0 && player.dashTimer <= 0) {
+  if (pending.dash && player.dashCooldown <= 0 && player.dashTimer <= 0) {
     const moveMag = Math.hypot(actions.move.dx, actions.move.dy);
     if (moveMag > 0.1) {
       player.dashDirX = actions.move.dx / moveMag;
@@ -561,6 +633,7 @@ export function stepWorldSimulation(world, actions, dt, audio, effects, onStateC
       world.lanternHp <= 0
         ? 'The Heart-Lantern was snuffed by the creeping rime.'
         : 'Your Weaver vessel shattered inside the Crucible.';
+    clearCombatBuffer(world);
     world.mode = 'gameover';
     audio.playDefeatToll();
     if (onStateChange) onStateChange('gameover');
@@ -578,6 +651,7 @@ export function stepWorldSimulation(world, actions, dt, audio, effects, onStateC
     world.score += integrityBonus;
     world.lanternHp = Math.min(world.lanternMaxHp, world.lanternHp + 14);
     world.player.hp = Math.min(world.player.maxHp, world.player.hp + 1);
+    clearCombatBuffer(world);
 
     if (world.trialIndex >= TRIAL_WAVES.length) {
       world.mode = 'victory';

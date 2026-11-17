@@ -1,6 +1,13 @@
 // Layered 2D Canvas renderer: Crucible astrolabe arena, stained-glass prisms, beams, foes, and wing HUD.
 
-import { ARENA, DIFFICULTY_MODES, PRISM_ORDER, PRISM_SPECS, TRIAL_WAVES } from './config.js';
+import {
+  ARENA,
+  DIFFICULTY_MODES,
+  formatComboMultiplier,
+  PRISM_ORDER,
+  PRISM_SPECS,
+  TRIAL_WAVES,
+} from './config.js';
 import { clampPrismPosition } from './prisms.js';
 import { TEMPERING_CATALOG } from './temperings.js';
 
@@ -407,8 +414,16 @@ function renderEntitiesAndBeams(ctx, world, effects) {
     ctx.fillStyle = '#8ce8ff';
     ctx.fill();
 
-    // Rotating Glacial Aegis arcs
-    if (world.pylons.length === 0) {
+    // Rotating Glacial Aegis arcs & phase-transition ward shimmer
+    if (b.phaseGuardTimer > 0) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.radius + 13, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(140, 232, 255, 0.88)';
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+      ctx.restore();
+    } else if (world.pylons.length === 0) {
       for (const base of [b.shieldAngle, b.shieldAngle + Math.PI]) {
         ctx.beginPath();
         ctx.arc(b.x, b.y, b.radius + 9, base - 0.5, base + 0.5);
@@ -853,14 +868,20 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
   ctx.font = '800 11.5px "Avenir Next", "Segoe UI", sans-serif';
   ctx.fillText('RESONANCE MULTIPLIER', rx + 14, 148);
 
+  ctx.textAlign = 'right';
+  ctx.fillStyle = '#9aa6c4';
+  ctx.font = '700 10.5px "Avenir Next", "Segoe UI", sans-serif';
+  ctx.fillText(`STREAK ${world.combo}/12`, rx + rw - 14, 148);
+  ctx.textAlign = 'left';
+
   ctx.fillStyle = world.combo >= 8 ? '#ffd24c' : world.combo >= 4 ? '#18e4ff' : '#e6ecf8';
   ctx.font = '900 28px "Avenir Next", "Segoe UI", sans-serif';
-  ctx.fillText(`x${world.combo} COMBO`, rx + 14, 182);
+  ctx.fillText(formatComboMultiplier(world.combo), rx + 14, 182);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#b6bfd8';
   ctx.font = '700 11.5px "Avenir Next", "Segoe UI", sans-serif';
-  ctx.fillText(`PEAK x${world.stats.maxCombo}`, rx + rw - 14, 182);
+  ctx.fillText(`PEAK ${formatComboMultiplier(world.stats.maxCombo)}`, rx + rw - 14, 182);
   ctx.textAlign = 'left';
 
   const comboPct = world.combo > 1 ? Math.max(0, world.comboTimer / 4.2) : 0;
@@ -1002,6 +1023,13 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
     bGrad.addColorStop(1, '#9b7ede');
     ctx.fillStyle = bGrad;
     ctx.fill();
+
+    // 34% and 66% phase gate notches on Boss HP bar
+    ctx.fillStyle = 'rgba(255, 246, 223, 0.85)';
+    for (const gate of [0.34, 0.66]) {
+      const gx = bx + 16 + (bw - 32) * gate;
+      ctx.fillRect(gx - 1, by + 25, 2, 13);
+    }
   } else if (world.mode === 'playing') {
     const bw = 580;
     const bx = ARENA.centerX - bw / 2;

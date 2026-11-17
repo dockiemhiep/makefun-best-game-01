@@ -8,7 +8,7 @@
 
 ### Features
 
-- **Geometric Prism-Refraction Combat:** Place and recall stained-glass Prisms (`Right Click` / `E` / `Q`) that split bolts into crimson fans, chain lightning-fast slowing arcs, and detonate solar shockwaves, escalating up to **x12 Resonance Combos**.
+- **Geometric Prism-Refraction Combat:** Place and recall stained-glass Prisms (`Right Click` / `E` / `Q`) that split bolts into crimson fans, chain lightning-fast slowing arcs, and detonate solar shockwaves, escalating up to **3.75x Resonance Multipliers** across 12-hit streaks.
 - **Tactical Enemy Variety & 3-Phase Boss:** Angle beams behind front-shielded **Slag Bulwarks** for Flank Shatters, intercept Prism-draining **Siphon Moths**, vaporize **Rime Caster** frost orbs, and shatter **Cryo Pylons** during Vespera's three-phase boss encounter.
 - **Forged Tempering Relics & Kiln Supernova:** Draft 1 of 3 permanent relic upgrades after each cleared Trial and unleash **Kiln Supernova (`F`)** at 100% Resonance to link every Prism into an arena-wide star polygon.
 - **100% Self-Contained Static Web App:** Fixed 60 Hz deterministic simulation, layered 2D Canvas visuals, procedural Dorian glass-harp WebAudio synthesizer and generative score, three difficulty modes, and saved high scores/stars under `game/`.

@@ -10,7 +10,11 @@ export function createInputController(canvas) {
     firing: false,
     usingPointer: false,
     deployRequested: false,
+    deployAimX: null,
+    deployAimY: null,
     recallRequested: false,
+    recallAimX: null,
+    recallAimY: null,
     dashRequested: false,
     novaRequested: false,
     pauseRequested: false,
@@ -50,6 +54,8 @@ export function createInputController(canvas) {
       state.firing = true;
     } else if (e.button === 2) {
       state.deployRequested = true;
+      state.deployAimX = pt.x;
+      state.deployAimY = pt.y;
     } else if (e.button === 1) {
       e.preventDefault();
       state.novaRequested = true;
@@ -64,7 +70,7 @@ export function createInputController(canvas) {
 
   function onWheel(e) {
     if (Math.abs(e.deltaY) > 4) {
-      state.cyclePrismRequested = e.deltaY > 0 ? 1 : -1;
+      state.cyclePrismRequested += e.deltaY > 0 ? 1 : -1;
     }
   }
 
@@ -89,8 +95,12 @@ export function createInputController(canvas) {
         state.dashRequested = true;
       } else if (code === 'KeyE') {
         state.deployRequested = true;
+        state.deployAimX = state.aimX;
+        state.deployAimY = state.aimY;
       } else if (code === 'KeyQ') {
         state.recallRequested = true;
+        state.recallAimX = state.aimX;
+        state.recallAimY = state.aimY;
       } else if (code === 'KeyF') {
         state.novaRequested = true;
       } else if (code === 'KeyP' || code === 'Escape') {
@@ -108,7 +118,7 @@ export function createInputController(canvas) {
       } else if (code === 'Digit3') {
         state.prismSelectRequested = 2;
       } else if (code === 'Tab') {
-        state.cyclePrismRequested = 1;
+        state.cyclePrismRequested += 1;
       }
     }
     keysDown.add(code);
@@ -158,7 +168,11 @@ export function createInputController(canvas) {
       aimY: state.aimY,
       firing: state.firing || isKeyHeldFire(),
       deployPrism: state.deployRequested,
+      deployAimX: state.deployAimX ?? state.aimX,
+      deployAimY: state.deployAimY ?? state.aimY,
       recallPrism: state.recallRequested,
+      recallAimX: state.recallAimX ?? state.aimX,
+      recallAimY: state.recallAimY ?? state.aimY,
       dash: state.dashRequested,
       nova: state.novaRequested,
       pause: state.pauseRequested,
@@ -169,7 +183,11 @@ export function createInputController(canvas) {
       cyclePrism: state.cyclePrismRequested,
     };
     state.deployRequested = false;
+    state.deployAimX = null;
+    state.deployAimY = null;
     state.recallRequested = false;
+    state.recallAimX = null;
+    state.recallAimY = null;
     state.dashRequested = false;
     state.novaRequested = false;
     state.pauseRequested = false;

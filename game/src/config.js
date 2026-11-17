@@ -161,12 +161,21 @@ export const ENEMY_SPECS = {
 
 export const BOSS_SPEC = {
   name: 'Vespera, The Rime Sovereign',
-  maxHp: 960,
+  maxHp: 1200,
   radius: 36,
   orbitRadius: 205,
   score: 3200,
-  pylonHp: 95,
+  pylonHp: 110,
 };
+
+export function computeComboMultiplier(combo) {
+  const clamped = Math.max(1, Math.min(12, Math.floor(Number(combo) || 1)));
+  return 1 + (clamped - 1) * 0.25;
+}
+
+export function formatComboMultiplier(combo) {
+  return `${computeComboMultiplier(combo).toFixed(2)}x`;
+}
 
 export const TRIAL_WAVES = [
   {

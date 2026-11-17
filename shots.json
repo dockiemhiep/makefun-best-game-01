@@ -1,0 +1,6 @@
+[
+  { "name": "1-play.jpg", "query": "?seed=20261116", "scene": "trial-2-prism-refraction-combat" },
+  { "name": "2-title.jpg", "query": "?seed=20261116", "scene": "title-screen" },
+  { "name": "3-boss.jpg", "query": "?seed=20261116", "scene": "trial-5-vespera-phase-2-cryo-pylons" },
+  { "name": "4-victory.jpg", "query": "?seed=20261116", "scene": "victory-summary-and-restart" }
+]

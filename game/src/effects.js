@@ -206,6 +206,7 @@ export function createEffectsSystem(rng) {
     afterimages,
     get shakeX() { return shakeX; },
     get shakeY() { return shakeY; },
+    get hitStopTimer() { return hitStopTimer; },
     get flashAlpha() { return flashAlpha; },
     get flashColor() { return flashColor; },
     spawnGlassShards,

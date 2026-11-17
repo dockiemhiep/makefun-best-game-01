@@ -1,6 +1,6 @@
 // Accessible DOM overlay screens: Title, Codex, Tempering Draft, Pause, Victory, and Defeat.
 
-import { DIFFICULTY_MODES } from './config.js';
+import { DIFFICULTY_MODES, formatComboMultiplier } from './config.js';
 import { TEMPERING_CATALOG } from './temperings.js';
 import { computeRunStars } from './world.js';
 
@@ -70,7 +70,7 @@ export function createOverlayUI(rootEl, handlers) {
           <div class="codex-columns">
             <div class="codex-box">
               <h3>Refraction Rules</h3>
-              <p>Shoot any deployed <strong>Stained-Glass Prism</strong> to amplify and split your Ember Bolt into instant piercing beams. Prisms within link range chain automatically for massive <strong>x12 Resonance Combos</strong>.</p>
+              <p>Shoot any deployed <strong>Stained-Glass Prism</strong> to amplify and split your Ember Bolt into instant piercing beams. Prisms within link range chain automatically for up to <strong>3.75x Resonance Multipliers</strong> across 12-hit streaks.</p>
               <p>Collect dropped <strong>Glass Shards</strong> to recharge Prisms and fill your <strong>Kiln Supernova [F]</strong>.</p>
             </div>
             <div class="codex-box">
@@ -207,7 +207,7 @@ export function createOverlayUI(rootEl, handlers) {
           </div>
           <div class="codex-box">
             <h3>Current Run</h3>
-            <p>Score: <strong>${world.score.toLocaleString('en-US')}</strong> · Peak Combo: <strong>x${world.stats.maxCombo}</strong><br>
+            <p>Score: <strong>${world.score.toLocaleString('en-US')}</strong> · Peak Multiplier: <strong>${formatComboMultiplier(world.stats.maxCombo)}</strong> (${world.stats.maxCombo} streak)<br>
             Lantern Warmth: <strong>${Math.ceil(world.lanternHp)}/${world.lanternMaxHp}</strong></p>
           </div>
         </div>
@@ -264,8 +264,8 @@ export function createOverlayUI(rootEl, handlers) {
             <div class="stat-label">Final Score</div>
           </div>
           <div class="stat-tile">
-            <div class="stat-value">x${world.stats.maxCombo}</div>
-            <div class="stat-label">Peak Combo</div>
+            <div class="stat-value">${formatComboMultiplier(world.stats.maxCombo)}</div>
+            <div class="stat-label">Peak Multiplier</div>
           </div>
           <div class="stat-tile">
             <div class="stat-value">${world.stats.trialsCleared} / 5</div>

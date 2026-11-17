@@ -25,7 +25,7 @@ export const TEMPERING_CATALOG = [
     id: 'heartfire_mend',
     name: 'Heartfire Mend',
     tag: 'Sanctuary',
-    desc: 'Restores +30 Lantern warmth now; x6+ combo kills heal the Heart-Lantern.',
+    desc: 'Restores +30 Lantern warmth now; 6+ streak kills (2.25x+) heal the Heart-Lantern.',
     immediateLanternHeal: 30,
     immediatePlayerHeal: 1,
     apply(mods) {
