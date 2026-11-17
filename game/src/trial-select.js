@@ -21,7 +21,7 @@ export function renderTrialSelectScreen(world, save) {
       <span class="trial-enter">${next ? 'ENTER TRIAL →' : enabled ? record.cleared ? 'REPLAY TRIAL →' : 'ENTER TRIAL →' : record.cleared ? 'TRIAL CLEARED' : 'CLEAR TRIAL ' + i}</span>
     </button>`;
   }).join('');
-  return `<section class="overlay-screen progression-screen" aria-label="Trial select and progression">
+  return `<section class="overlay-screen stained-menu progression-screen" aria-label="Trial select and progression">
     <div class="eyebrow-row"><span>${DIFFICULTY_MODES[world.difficulty].label.toUpperCase()} · FIVE KILN TRIALS</span><span>${records.filter(t => t.cleared).length} / 5 CLEARED</span></div>
     <header class="hero-header"><h2 class="result-heading">TRIAL SELECT</h2>
       <p class="game-subtitle">${world.pendingTrial ? 'Your relic is forged. The next trial awaits.' : 'Clear each trial to unlock the next. Forge a relic after every clear.'}</p></header>

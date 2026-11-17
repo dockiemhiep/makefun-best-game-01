@@ -1010,54 +1010,109 @@ function renderWingHud(ctx, world, saveData, audioMuted) {
   ctx.restore();
 }
 
-// The title's rose window is original live Canvas geometry, built from the combat palette.
+// The rose window is original live Canvas geometry, built from the combat palette.
+// It is the game's emblem: lit on the title, and a dimmer backdrop behind every menu.
+const ROSE_GLASS_COLORS = ['#ff4f74', '#ff9a3d', '#ffd166', '#2fd6e3', '#3d8fb8', '#b8437f'];
+
+function fillGlassPane(ctx, vertices, color, alpha) {
+  ctx.beginPath();
+  vertices.forEach(([x, y], k) => (k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.closePath();
+  ctx.globalAlpha = alpha; ctx.fillStyle = color; ctx.fill();
+  ctx.globalAlpha = 1; ctx.strokeStyle = '#0b1120'; ctx.lineWidth = 5; ctx.lineJoin = 'round'; ctx.stroke();
+}
+
+function drawRoseWindow(ctx, cx, cy, radius, time) {
+  const inner = radius * 0.3, mid = radius * 0.665, band = radius * 1.13;
+  const point = (angle, r) => [Math.cos(angle) * r, Math.sin(angle) * r];
+  ctx.save(); ctx.translate(cx, cy);
+  ctx.beginPath(); ctx.arc(0, 0, band + 6, 0, Math.PI * 2); ctx.fillStyle = '#0b1120'; ctx.fill();
+  for (let i = 0; i < 24; i++) {
+    const a = i * Math.PI / 12 - Math.PI / 2, b = a + Math.PI / 12;
+    fillGlassPane(ctx, [point(a, radius), point(a, band), point(b, band), point(b, radius)],
+      ROSE_GLASS_COLORS[(i * 2 + 3) % 6], i % 2 ? 0.5 : 0.78);
+  }
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6 - Math.PI / 2, b = a + Math.PI / 6, m = (a + b) / 2;
+    const panes = [
+      [point(a, inner), point(m, mid), point(b, inner)],
+      [point(a, inner), point(a, radius), point(m, mid)],
+      [point(b, inner), point(m, mid), point(b, radius)],
+      [point(a, radius), point(m, mid), point(b, radius)],
+    ];
+    panes.forEach((vertices, j) => fillGlassPane(ctx, vertices, ROSE_GLASS_COLORS[(i + j) % 6],
+      j === 0 ? 1 : 0.8 + Math.sin(i * 3 + j) * 0.16));
+  }
+  // Lantern light floods the glass from the centre outward.
+  const flood = ctx.createRadialGradient(0, 0, inner * 0.5, 0, 0, band);
+  flood.addColorStop(0, 'rgba(255, 226, 160, 0.42)'); flood.addColorStop(0.55, 'rgba(255, 190, 110, 0.12)'); flood.addColorStop(1, 'rgba(255, 190, 110, 0)');
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.beginPath(); ctx.arc(0, 0, band, 0, Math.PI * 2); ctx.fillStyle = flood; ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+  for (const [r, w] of [[band + 5, 5], [radius, 3], [inner + 1, 3]]) {
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.strokeStyle = '#e2b56a'; ctx.lineWidth = w; ctx.stroke();
+  }
+  // The Heart-Lantern floats in the window's central, brass-set aperture.
+  drawPolygon(ctx, 0, 0, inner * 0.84, 8, Math.PI / 8); ctx.fillStyle = '#182339'; ctx.fill(); ctx.strokeStyle = '#f4c979'; ctx.lineWidth = 3; ctx.stroke();
+  const pulse = 1 + Math.sin(time * 2) * 0.025;
+  ctx.shadowColor = '#ffb849'; ctx.shadowBlur = radius * 0.16;
+  drawPolygon(ctx, 0, 0, inner * 0.6 * pulse, 4, 0); ctx.fillStyle = '#ffb849'; ctx.fill();
+  ctx.shadowBlur = 0;
+  drawPolygon(ctx, 0, 0, inner * 0.33, 4, 0); ctx.fillStyle = '#fff2cd'; ctx.fill();
+  ctx.restore();
+}
+
+// Coloured light thrown by the window: soft wedges of each glass hue plus a warm halo.
+function drawRoseLightRays(ctx, cx, cy, reach, strength) {
+  ctx.save(); ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 18; i++) {
+    const a = i * Math.PI / 9 + 0.12, half = 0.05 + (i % 3) * 0.022;
+    const ray = ctx.createRadialGradient(cx, cy, reach * 0.22, cx, cy, reach);
+    ray.addColorStop(0, ROSE_GLASS_COLORS[i % 6]); ray.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.globalAlpha = strength; ctx.fillStyle = ray;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a - half) * reach, cy + Math.sin(a - half) * reach);
+    ctx.lineTo(cx + Math.cos(a + half) * reach, cy + Math.sin(a + half) * reach);
+    ctx.closePath(); ctx.fill();
+  }
+  const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, reach * 0.7);
+  halo.addColorStop(0, 'rgba(255, 170, 70, 1)'); halo.addColorStop(1, 'rgba(255, 170, 70, 0)');
+  ctx.globalAlpha = strength * 1.6; ctx.fillStyle = halo; ctx.fillRect(0, 0, ARENA.width, ARENA.height);
+  ctx.restore();
+}
+
 function renderTitleStainedGlass(ctx, world) {
   ctx.fillStyle = '#080d18';
   ctx.fillRect(0, 0, ARENA.width, ARENA.height);
-  const cx = 962, cy = 350, radius = 238;
-  const halo = ctx.createRadialGradient(cx, cy, 40, cx, cy, 370);
-  halo.addColorStop(0, '#253953'); halo.addColorStop(.65, '#111e32'); halo.addColorStop(1, '#080d18');
-  ctx.fillStyle = halo; ctx.fillRect(650, 0, 630, 720);
-  const colors = ['#e64b6b', '#ef9442', '#eac366', '#38bfc9', '#3c819d', '#a13e72'];
-  ctx.save(); ctx.translate(cx, cy);
-  ctx.strokeStyle = '#101827'; ctx.lineWidth = 5;
-  for (let i = 0; i < 12; i++) {
-    const a = i * Math.PI / 6 - Math.PI / 2;
-    const b = a + Math.PI / 6;
-    const mid = (a + b) / 2;
-    const point = (angle, r) => [Math.cos(angle) * r, Math.sin(angle) * r];
-    const polygons = [
-      [point(a, 72), point(mid, 158), point(b, 72)],
-      [point(a, 72), point(a, radius), point(mid, 158)],
-      [point(b, 72), point(mid, 158), point(b, radius)],
-      [point(a, radius), point(mid, 158), point(b, radius)],
-    ];
-    polygons.forEach((vertices, j) => {
-      ctx.beginPath(); vertices.forEach(([x, y], k) => k ? ctx.lineTo(x, y) : ctx.moveTo(x, y)); ctx.closePath();
-      ctx.fillStyle = colors[(i + j) % colors.length]; ctx.globalAlpha = j === 0 ? .95 : .62 + Math.sin(i * 3 + j) * .15;
-      ctx.fill(); ctx.globalAlpha = 1; ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(...vertices[0]); ctx.lineTo(...vertices[1]);
-      ctx.strokeStyle = 'rgba(255, 239, 196, .28)'; ctx.lineWidth = 1; ctx.stroke();
-      ctx.strokeStyle = '#101827'; ctx.lineWidth = 5;
-    });
-  }
-  for (const r of [radius + 2, radius + 14, 73]) {
-    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.strokeStyle = '#d6ac67'; ctx.lineWidth = r === radius + 2 ? 4 : 1.5; ctx.stroke();
-  }
-  // The Heart-Lantern floats in the window's central, brass-set aperture.
-  drawPolygon(ctx, 0, 0, 61, 8, Math.PI / 8); ctx.fillStyle = '#182339'; ctx.fill(); ctx.strokeStyle = '#f4c979'; ctx.lineWidth = 3; ctx.stroke();
-  const pulse = 1 + Math.sin(world.time * 2) * .025;
-  drawPolygon(ctx, 0, 0, 44 * pulse, 4, 0); ctx.fillStyle = '#ffb849'; ctx.fill();
-  drawPolygon(ctx, 0, 0, 24, 4, 0); ctx.fillStyle = '#fff2cd'; ctx.fill();
-  ctx.restore();
-  ctx.font = '700 12px "Avenir Next", "Segoe UI", sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#c6a574';
-  ctx.fillText('THE HEART-LANTERN', cx, 652);
-  ctx.font = '500 11px "Avenir Next", "Segoe UI", sans-serif'; ctx.fillStyle = '#8f9eba';
-  ctx.fillText('A flame worth defending.', cx, 674); ctx.textAlign = 'left';
+  drawRoseLightRays(ctx, 980, 360, 900, 0.16);
+  // Keep the wordmark side calm.
+  const calm = ctx.createLinearGradient(0, 0, 720, 0);
+  calm.addColorStop(0, 'rgba(8, 13, 24, 0.82)'); calm.addColorStop(1, 'rgba(8, 13, 24, 0)');
+  ctx.fillStyle = calm; ctx.fillRect(0, 0, 720, ARENA.height);
+  drawRoseWindow(ctx, 980, 360, 246, world.time);
+}
+
+// Menus share the title's window as a backdrop; its light tells the result at a glance.
+const MENU_BACKDROPS = {
+  trials: { cy: 360, radius: 330, light: 0.11, veil: 'rgba(8, 13, 24, 0.66)' },
+  tempering: { cy: 360, radius: 330, light: 0.12, veil: 'rgba(8, 13, 24, 0.62)' },
+  victory: { cy: 215, radius: 250, light: 0.26, veil: 'rgba(12, 12, 20, 0.34)' },
+  gameover: { cy: 215, radius: 250, light: 0.05, veil: 'rgba(16, 22, 50, 0.80)' },
+};
+
+function renderMenuBackdrop(ctx, world) {
+  const look = MENU_BACKDROPS[world.mode];
+  ctx.fillStyle = '#080d18';
+  ctx.fillRect(0, 0, ARENA.width, ARENA.height);
+  drawRoseLightRays(ctx, ARENA.width / 2, look.cy, 980, look.light);
+  drawRoseWindow(ctx, ARENA.width / 2, look.cy, look.radius, world.time);
+  ctx.fillStyle = look.veil;
+  ctx.fillRect(0, 0, ARENA.width, ARENA.height);
 }
 
 export function renderGameFrame(ctx, world, effects, inputState, saveData, audioMuted) {
   if (world.mode === 'title') { renderTitleStainedGlass(ctx, world); return; }
+  if (MENU_BACKDROPS[world.mode]) { renderMenuBackdrop(ctx, world); return; }
   ctx.save();
   ctx.translate(effects.shakeX, effects.shakeY);
 
@@ -1076,5 +1131,6 @@ export function renderGameFrame(ctx, world, effects, inputState, saveData, audio
     ctx.restore();
   }
 
-  renderWingHud(ctx, world, saveData, audioMuted);
+  // Paused: the frozen arena stays visible under the dialog's veil, without HUD fragments.
+  if (world.mode === 'playing') renderWingHud(ctx, world, saveData, audioMuted);
 }

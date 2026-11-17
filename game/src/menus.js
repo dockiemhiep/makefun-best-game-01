@@ -126,18 +126,18 @@ export function createGameMenus(rootEl, handlers) {
             <p class="title-mantra">REFRACT THE FLAME.</p>
           </header>
           <p class="title-goal">Build a prism web. Defend the Heart-Lantern.<br>Survive five trials. Shatter the Rime Sovereign.</p>
-          <div class="prism-legend"><span class="ruby">◆ SPLIT</span><span class="cyan">⬡ CHAIN</span><span class="topaz">✦ DETONATE</span></div>
+          <div class="prism-legend"><span class="ruby">◆ RUBY SPLITS</span><span class="cyan">◆ CYAN CHAINS</span><span class="topaz">◆ TOPAZ DETONATES</span></div>
           <div class="difficulty-bar" role="group" aria-label="Select Difficulty">${diffButtons}</div>
           <div class="cta-row">
             <button class="btn-primary" id="btn-start-run" data-action="start-run" data-focus-first>START RUN <small>[ENTER]</small></button>
             <button class="btn-secondary" data-action="open-trials">TRIAL SELECT</button>
           </div>
+          <div class="title-controls" aria-label="Controls"><span><b>WASD</b> Move</span><span><b>CLICK</b> Fire</span><span><b>E</b> Prism</span><span><b>SPACE</b> Dash</span></div>
           <div class="title-utility">
             <button class="text-button" data-action="open-codex">HOW TO PLAY</button>
             <button class="text-button" data-action="toggle-mute">${audioMuted ? 'SOUND OFF [M]' : 'SOUND ON [M]'}</button>
-            <span>BEST ${saveData.bestScore.toLocaleString('en-US')}</span>
+            <span class="title-best">BEST ${saveData.bestScore.toLocaleString('en-US')}</span>
           </div>
-          <div class="title-controls"><span><b>WASD</b> MOVE</span><span><b>CLICK</b> FIRE</span><span><b>RMB / E</b> PRISM</span><span><b>SPACE</b> DASH</span><span><b>ESC / P</b> PAUSE</span></div>
         </div>
       </section>
     `;
@@ -148,21 +148,21 @@ export function createGameMenus(rootEl, handlers) {
     const cardsHtml = world.draftChoices
       .map(
         (choice, index) => `
-        <button class="tempering-card" data-tempering="${choice.id}">
+        <button class="tempering-card ${['glass-ruby', 'glass-cyan', 'glass-topaz'][index % 3]}" data-tempering="${choice.id}">
           <div>
             <div class="tempering-tag">${escapeHtml(choice.tag)}</div>
             <div class="tempering-name">${escapeHtml(choice.name)}</div>
             <div class="tempering-effect"><strong>${escapeHtml(choice.effect.split(' ')[0])}</strong><span>${escapeHtml(choice.effect.split(' ').slice(1).join(' '))}</span></div>
             <div class="tempering-desc">${escapeHtml(choice.desc)}</div>
           </div>
-          <div class="tempering-pick-hint">FORGE RELIC [${index + 1}]</div>
+          <div class="tempering-pick-hint">FORGE RELIC <kbd>${index + 1}</kbd></div>
         </button>
       `,
       )
       .join('');
 
     rootEl.innerHTML = `
-      <section class="overlay-screen upgrade-screen" aria-label="Choose an upgrade">
+      <section class="overlay-screen stained-menu upgrade-screen" aria-label="Choose an upgrade">
         <div class="eyebrow-row">
           <span>TRIAL ${world.trialIndex} CLEARED · KILN FORGE</span>
           <span class="best-pill">SCORE: ${world.score.toLocaleString('en-US')}</span>
@@ -174,7 +174,7 @@ export function createGameMenus(rootEl, handlers) {
         <div class="draft-grid">
           ${cardsHtml}
         </div>
-        <div class="upgrade-route" aria-label="Run route">${[1,2,3,4,5].map(n => `<span class="${n <= world.trialIndex ? 'done' : ''}">${String(n).padStart(2, '0')} ${n <= world.trialIndex ? 'CLEARED' : n === world.trialIndex + 1 ? 'NEXT' : n === 5 ? 'BOSS' : 'LOCKED'}</span>`).join('<i>→</i>')}</div>
+        <div class="upgrade-route" aria-label="Run route">${[1,2,3,4,5].map(n => `<span class="${n <= world.trialIndex ? 'done' : n === world.trialIndex + 1 ? 'upcoming' : ''}"><b>${n <= world.trialIndex ? '✓' : n}</b>${n <= world.trialIndex ? 'CLEARED' : n === world.trialIndex + 1 ? 'NEXT' : n === 5 ? 'BOSS' : 'LOCKED'}</span>`).join('<i></i>')}</div>
       </section>
     `;
     bindCommonButtons();
@@ -219,7 +219,7 @@ export function createGameMenus(rootEl, handlers) {
         : '<span class="relic-chip">No Temperings Forged</span>';
 
     rootEl.innerHTML = `
-      <section class="overlay-screen compact-modal" aria-label="${isVictory ? 'Victory Summary' : 'Defeat Summary'}">
+      <section class="overlay-screen stained-menu results-screen ${isVictory ? 'is-victory' : 'is-defeat'}" aria-label="${isVictory ? 'Victory Summary' : 'Defeat Summary'}">
         <div class="eyebrow-row">
           <span>${isVictory ? (world.runStartTrial === 1 ? 'ALL 5 KILN TRIALS CONQUERED' : 'THE RIME SOVEREIGN DEFEATED') : `FALLEN ON TRIAL ${world.trialIndex} OF 5`}</span>
           <span class="best-pill">${world.isNewBest ? '★ NEW HIGH SCORE! ★' : `BEST: ${saveData.bestScore.toLocaleString('en-US')}`}</span>
@@ -239,11 +239,12 @@ export function createGameMenus(rootEl, handlers) {
           </p>
         </div>
 
+        <div class="score-hero">
+          <div class="stat-label">Final Score</div>
+          <div class="stat-value">${world.score.toLocaleString('en-US')}</div>
+        </div>
+
         <div class="stats-grid">
-          <div class="stat-tile">
-            <div class="stat-value">${world.score.toLocaleString('en-US')}</div>
-            <div class="stat-label">Final Score</div>
-          </div>
           <div class="stat-tile">
             <div class="stat-value">${formatComboMultiplier(world.stats.maxCombo)}</div>
             <div class="stat-label">Peak Multiplier</div>
